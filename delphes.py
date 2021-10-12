@@ -49,8 +49,12 @@ for e in t:
         #
         # The PID contains the PDG ID of the particle (aka the type) using the
         # scheme at https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
+        #
         # The Status contains the status in the generator. Use status 23 for the
-        # b-quarks. Use status 43(confirm?) for the gluon.
+        # b-quarks to select ones from the Feynman diagram.
+        #
+        # Use different samples to determine what particle the b / light quarks came
+        # came from.
 
         # Loop over all particles in the jet
         for c in fj.Constituents:
@@ -68,7 +72,7 @@ for e in t:
 
             # Add to image
             image[myeta,myphi] = c.PT
-            n+=1
+        n+=1
 
 # average the image
 image/=n
@@ -76,7 +80,7 @@ image/=n
 # %% Show the image of the average jet shape
 ## Homework 3
 # Make a separate plot for the three categories
-plt.imshow(image,extent=(etamin,etamax,phimin,phimax))
+plt.imshow(np.log10(image),extent=(etamin,etamax,phimin,phimax))
 plt.xlabel('$\eta$')
 plt.ylabel('$\phi$')
 
