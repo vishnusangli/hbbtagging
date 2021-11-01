@@ -85,10 +85,6 @@ for e in t:
                 if p.PID in flag.keys():
                     #if p.PID == 25 and p.PT < 500:
                         #continue
-                    if p.PID == 25 and p.Status in status_dict.keys():
-                        status_dict[p.Status] += 1
-                    elif p.PID == 25:
-                        status_dict[p.Status] = 1
                     flag[p.PID] += 1
         img_use = image3
         if flag[5] and flag[-5] and flag[25]: #Guessing the order takes precedence. This exclusivity of image objects would otherwise allow same jet to be classified in different ones
