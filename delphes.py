@@ -1,19 +1,29 @@
+#%% Add Delphes path env vars
+os.environ['LD_LIBRARY_PATH'] += ':/global/homes/v/vsangli/starters/MG5_aMC_v3_2_0/Delphes'
+os.environ['ROOT_INCLUDE_PATH']=':/global/homes/v/vsangli/starters/MG5_aMC_v3_2_0/:/global/homes/v/vsangli/starters/MG5_aMC_v3_2_0/Delphes/external'
 # %% Import important packages
 import ROOT
-
 import numpy as np
 import matplotlib.pyplot as plt
 
 # %% Add Delphes library
 ROOT.gSystem.Load(f'libDelphes')
-
+print("checkpoint")
 # %% Load some samples
 SAMPLEDIR='/global/cfs/cdirs/atlas/kkrizka/hbbvsgbb/samples'
-fh = ROOT.TFile.Open(f'{SAMPLEDIR}/PROC_gbba/Events/run_01/tag_1_delphes_events.root')
+DATA_DIR = "../data"
+BGROUND = ["PROC_gbba"]
+M_SIG = ["PROC_hbbwlnu"]
+I_SIG = ["PROC_ja"]
+FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
+
+CURRFILE = M_SIG[0]
+fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
 t.Show()
-# %% Loop over all jets and create an average image
+# %% File-specific filter funcs -- rejection based
+
 
 # Create an empty image corresponding to eta/phi
 check = []
@@ -32,10 +42,12 @@ image0 = np.zeros((etabin,phibin), dtype=float)
 image1 = np.zeros((etabin,phibin), dtype=float)
 image2 = np.zeros((etabin,phibin), dtype=float)
 image3 = np.zeros((etabin,phibin), dtype=float)
+status_dict = {}
 #%%
 # Loop over all event
 a = 0
 n=0
+num_vals = [0, 0, 0, 0]
 for e in t:
     # Loop over all jets in the event
     for fj in e.GenFatJet:
@@ -56,28 +68,40 @@ for e in t:
         # The PID contains the PDG ID of the particle (aka the type) using the
         # scheme at https://pdg.lbl.gov/2007/reviews/montecarlorpp.pdf
         # The Status contains the status in the generator. Use status 23 for the
-        # b-quarks. Use status 43(confirm?) for the gluon.
-        flag = [1, 2, 5, -5, 21, 35]
+        # b-quarks to select ones from the Feynman diagram.
+        #
+        # Use different samples to determine what particle the b / light quarks came
+        # came from.
+        #include charm and strange
+        flag = [1, 2, 3, 4, 5, -5, 21, 25]
         flag = {a: 0 for a in flag}
-
+        total_pt = 0
         for p in t.Particle:
-            print(p.ClassName())
-            print(dir(p))
-            assert(0> 1), "Exit Point"
-            if p.Status != 23:
-                continue
+            #if p.Status != 23:
+            #    continue
             delt_r = np.sqrt(np.power(p.Phi - fj.Phi, 2) + np.power(p.Eta - fj.Eta, 2))
             if delt_r < 0.5:
+                total_pt += p.PT
                 if p.PID in flag.keys():
+                    #if p.PID == 25 and p.PT < 500:
+                        #continue
+                    if p.PID == 25 and p.Status in status_dict.keys():
+                        status_dict[p.Status] += 1
+                    elif p.PID == 25:
+                        status_dict[p.Status] = 1
                     flag[p.PID] += 1
-        
         img_use = image3
-        if flag[5] and flag[-5] and flag[35]: #Guessing the order takes precedence. This exclusivity of image objects would otherwise allow same jet to be classified in different ones
+        if flag[5] and flag[-5] and flag[25]: #Guessing the order takes precedence. This exclusivity of image objects would otherwise allow same jet to be classified in different ones
+            num_vals[0] += 1
             img_use = image0
-        if flag[5] and flag[-5] and flag[21]:
+        elif flag[5] and flag[-5] and flag[21]:
+            num_vals[1] += 1
             img_use = image1
-        if flag[21] and flag[1] and flag[2]:
-            img_use = image2        
+        elif flag[21] and ((flag[1] and flag[2]) or (flag[3] and flag[4])):
+            num_vals[2] += 1
+            img_use = image2  
+        else:
+            num_vals[3] += 1      
         a += 1
 
         # Loop over all particles in the jet
@@ -87,7 +111,7 @@ for e in t:
             # ie: delta eta = c.Eta - fj.Eta
             myeta= int(np.floor((c.Eta - fj.Eta - etamin)/etawdt)) 
             myphi= int(np.floor((c.Phi - fj.Phi - phimin)/phiwdt)) 
-            check.append([myeta, myphi, c.PT])
+            #check.append([myeta, myphi, c.PT])
             # Bounds check
             if myeta < 0 or myeta >= image.shape[0]:
                 continue
@@ -101,19 +125,35 @@ for e in t:
 
 # average the image
 image/=n
+print("Done with Iteration")
+# %% Average the plots
+image0/=(1 or num_vals[0])
+image1/=(1 or num_vals[1])
+image2/=(1 or num_vals[2])
+image3/=(1 or num_vals[3])
 # %% Show the image of the average jet shape
-## Homework 3
-# Make a separate plot for the three categories
-plt.imshow(image,extent=(etamin,etamax,phimin,phimax))
+plt.imshow(np.log10(image),extent=(etamin,etamax,phimin,phimax))
 plt.xlabel('$\eta$')
 plt.ylabel('$\phi$')
 plt.colorbar()
+plt.title(f"{CURRFILE} Average jet substructure")
+plt.savefig(f"{DATA_DIR}/{CURRFILE}/total.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
 # %%
-fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
-ax1.imshow(image0,extent=(etamin,etamax,phimin,phimax))
-ax2.imshow(image1,extent=(etamin,etamax,phimin,phimax))
-ax3.imshow(image2,extent=(etamin,etamax,phimin,phimax))
-ax4.imshow(image3,extent=(etamin,etamax,phimin,phimax))
+fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex = True, sharey = True)
+im = ax1.imshow(np.log10(image0),extent=(etamin,etamax,phimin,phimax))
+ax1.set_title("0: Hbb")
+im = ax2.imshow(np.log10(image1),extent=(etamin,etamax,phimin,phimax))
+ax2.set_title("1: gbb")
+im = ax3.imshow(np.log10(image2),extent=(etamin,etamax,phimin,phimax))
+ax3.set_title("2: gsc, gtd")
+im = ax4.imshow(np.log10(image3),extent=(etamin,etamax,phimin,phimax))
+ax4.set_title("3: Other")
+plt.suptitle(f"{CURRFILE} Average jet substructure")
+fig.subplots_adjust(right=0.8)
+fig.colorbar(im, ax = [ax1, ax2, ax3, ax4])
+plt.savefig(f"{DATA_DIR}/{CURRFILE}/labels.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
+
+
 # %%
