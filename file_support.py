@@ -54,6 +54,68 @@ class EventData:
         pass
 
 
+class ParticleDict:
+    def __init__(self, t) -> None:
+        self.pdict = [] #PID, Status, Phi, Eta, D1, D2
+        self.params = []
+        i = 0
+        for p in t.Particle:
+            self.pdict.append([i, p.PID, p.Status, p.D1, p.D2])
+            self.params.append([p.Phi, p.Eta])
+            i += 1
+    def track(self, e, pflag = False, limit = 10):
+        #tracks given particle until it decays into two diff
+        elems = [e]
+        if pflag:
+            print(self.pdict[e])
+        d1 = self.pdict[e][3]
+        d2 = self.pdict[e][4]
+        lim = 0
+        while d1 == d2:
+            elems.append(d1)
+            if pflag:
+                print(self.pdict[d1])
+            d1 = self.pdict[d1][3]
+            d2 = self.pdict[d1][4]
+            lim += 1
+            if lim == limit:
+                print(f"Larger than func limit {limit}")
+                break
+        if pflag:
+            print(self.pdict[d1])
+            print(self.pdict[d2])
+        elems.append(d1)
+        elems.append(d2)
+        return elems
+    def where(self, params, values):
+        translate = ["Elem", "PID", "Status", "D1", "D2"]
+        filters = []
+        output = []
+        for i in params:
+            if i in translate:
+                filters.append(translate.index(i))
+            else:
+                print(f"Incorrect filter {i}")
+                return []
+        for i in self.pdict:
+                flag = sum([i[filters[e]] == values[e] for e in range(0, len(filters))])
+                if flag:
+                    output.append(i)
+        return output
+
+    def give_ds(self, e, limit = 20):
+        d1 = self.pdict[e][3]
+        d2 = self.pdict[e][4]
+        lim = 0
+        while d1 == d2:
+            d1 = self.pdict[d1][3]
+            d2 = self.pdict[d1][4]
+            lim += 1
+            if lim == limit:
+                return 1, d1, d2
+        return 0, d1, d2
+
+
 def filter_func(PID, Status, delt_r, flag, file):
     if delt_r < 0.5:
         if file == "PROC_gbba": #Background
@@ -77,3 +139,4 @@ def filter_func(PID, Status, delt_r, flag, file):
                 flag[PID] += 1
         else:
             raise SyntaxError("Invalid file name for filter function")  
+

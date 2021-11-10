@@ -39,6 +39,11 @@ image0 = np.zeros((etabin,phibin), dtype=float)
 image1 = np.zeros((etabin,phibin), dtype=float)
 image2 = np.zeros((etabin,phibin), dtype=float)
 image3 = np.zeros((etabin,phibin), dtype=float)
+
+# %%
+# %%
+p_obj = ParticleDict(t)
+
 # %% Track status of particles
 status_dict = {}
 def status_track(status):
@@ -157,6 +162,3 @@ fig.subplots_adjust(right=0.8)
 fig.colorbar(im, ax = [ax1, ax2, ax3, ax4])
 plt.savefig(f"{DATA_DIR}/{CURRFILE}/labels.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
-
-
-# %%
