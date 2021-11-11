@@ -69,3 +69,6 @@ plt.xlabel("Prediction")
 plt.yticks(np.arange(0, 4, 1))
 plt.ylabel("Label")
 plt.title("Confusion Matrix")
+
+
+# %%

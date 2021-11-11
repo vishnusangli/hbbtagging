@@ -1,3 +1,4 @@
+# %%
 import numpy as np
 
 SAMPLEDIR='/global/cfs/cdirs/atlas/kkrizka/hbbvsgbb/samples'
@@ -116,27 +117,53 @@ class ParticleDict:
         return 0, d1, d2
 
 
-def filter_func(PID, Status, delt_r, flag, file):
-    if delt_r < 0.5:
-        if file == "PROC_gbba": #Background
-            #needs p.Status == 23 for jets from hard process
-            if PID in flag.keys(): #and Status == 23:??
-                if PID != 5 and PID != 5:
-                    flag[PID] += 1
-                elif Status == 23:
-                    flag[PID] += 1
-        elif file == "PROC_hbbwlnu":
-            #Specific scenario of Higgs decaying -- Uncertain as to how the daughter branch works again
-            #
-            if Status == 62 and PID == 25:
-                flag[25] += 1
-                flag[5] += 1 
+def filter_func(file, flag, jPhi, jEta, p_obj):
+    def in_jet(elem):
+        delt_r = np.sqrt(np.power(p_obj.params[elem][0] - jPhi, 2) + np.power(p_obj.params[elem][1] - jEta, 2))
+        return delt_r < 0.5
+    def check_event(elem, PID, d1_ref, status = 0):
+        if p_obj.pdict[elem][1] == PID and in_jet(elem):
+            f, d1, d2 = p_obj.give_ds(elem)
+            if f == 0:
+                if p_obj.pdict[d1][1] in d1_ref and  d1 == -d2 and in_jet(d1) and in_jet(d2):
+                    return True, [PID, d1, d2]
+        return False, []
+    fail = 0
+    for p in range(0, len(p_obj.pdict)):
+        if True:
+            if check_event(p, 21, [5])[0]:
+                flag[21] += 1
+                flag[5] += 1
                 flag[-5] += 1
-            elif PID != 25 and PID in flag.keys():
-                flag[PID] += 1
-        elif file == "PROC_ja":
-            if PID in flag.keys():
-                flag[PID] += 1
-        else:
-            raise SyntaxError("Invalid file name for filter function")  
+                return 0
+            elif check_event(p, 25, [5])[0]:
+                flag[25] += 1
+                flag[5] += 1
+                flag[-5] += 1
+                return 1
+            else:
+                success, vals = check_event(p, 21, [1, 2, 3, 4, 6])
+                if success:
+                    for i in vals:
+                        flag[i] += 1
+                    return 2
+                else:
+                    fail += 1
+                return 3
 
+        elif file == "PROC_hbbwlnu":
+            if check_event(p, 25, [1, 2, 3, 4, 6]):
+                flag[25] += 1
+                flag[5] += 1
+                flag[-5] += 1
+        elif file == "PROC_ja":
+            flag[21] += 1
+            flag[1] += 1
+            flag[-1] += 1
+        else:
+            raise SyntaxError("Incorrect filename")
+        return 4
+    
+
+
+# %%

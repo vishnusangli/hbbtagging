@@ -24,6 +24,7 @@ def plot_performance(data, labels, predictions, shape = (5, 4), start = 0):
         plt.imshow(data[elem + start])
         str_val = f"{predictions[elem + start]}({labels[elem + start]})"
         plt.xlabel(str_val, color = 'green' if np.argmax(predictions[elem + start]) == labels[elem + start] else 'red')
+        
 def shuffle_arrays(inputs, size = SIDE_SIZE,  seed = 0):
     """
     Shuffles a list of arrays in a single iteration (O(n) time).

@@ -21,7 +21,7 @@ CURRFILE = M_SIG[0]
 fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
-t.Show()
+t.Show(0)
 # Create an empty image corresponding to eta/phi
 check = []
 etamin=-1.5
@@ -39,8 +39,6 @@ image0 = np.zeros((etabin,phibin), dtype=float)
 image1 = np.zeros((etabin,phibin), dtype=float)
 image2 = np.zeros((etabin,phibin), dtype=float)
 image3 = np.zeros((etabin,phibin), dtype=float)
-
-# %%
 # %%
 p_obj = ParticleDict(t)
 
