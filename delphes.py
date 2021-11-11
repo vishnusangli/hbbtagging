@@ -5,7 +5,7 @@ os.environ['ROOT_INCLUDE_PATH']=':/global/homes/v/vsangli/starters/MG5_aMC_v3_2_
 import ROOT
 import numpy as np
 import matplotlib.pyplot as plt
-from file_support import *
+#from file_support import *
 # %% Add Delphes library
 ROOT.gSystem.Load(f'libDelphes')
 print("checkpoint")
@@ -40,16 +40,193 @@ image1 = np.zeros((etabin,phibin), dtype=float)
 image2 = np.zeros((etabin,phibin), dtype=float)
 image3 = np.zeros((etabin,phibin), dtype=float)
 # %%
-p_obj = ParticleDict(t)
+class ParticleDict:
+    def __init__(self, t) -> None:
+        """
+        Particle Dictionary to better interact with event particles
+        """
+        self.pdict = [] #PID, Status, Phi, Eta, D1, D2
+        self.params = []
+        i = 0
+        for p in t.Particle:
+            self.pdict.append([i, p.PID, p.Status, p.D1, p.D2])
+            self.params.append([p.Phi, p.Eta])
+            i += 1
+    def track(self, e, pflag = True, limit = 10):
+        """
+        Outputs the different entries of particles and the final daughters. \n
+        pflag: False removes verbose std output
+        """
+        #tracks given particle until it decays into two diff
+        elems = [e]
+        if pflag:
+            print(self.pdict[e])
+        d1 = self.pdict[e][3]
+        d2 = self.pdict[e][4]
+        lim = 0
+        while d1 == d2:
+            elems.append(d1)
+            if pflag:
+                print(self.pdict[d1])
+            d2 = self.pdict[d1][4]
+            d1 = self.pdict[d1][3]
+            lim += 1
+            if lim == limit:
+                print(f"Larger than func limit {limit}")
+                break
+        if pflag:
+            print(self.pdict[d1])
+            print(self.pdict[d2])
+        elems.append(d1)
+        elems.append(d2)
+        return elems
+    def where(self, params, values):
+        """
+        Filter function with given parameters: \n
+        "Elem" : pdict list element number \n
+        "PID": Particle PID \n
+        "Status": Particle Status \n
+        "D" List containing the daughter reg particles (abs) \n
+        """
+        translate = ["Elem", "PID", "Status", "D"]
+        filters = []
+        output = []
+        for i in params:
+            if i in translate:
+                if i == "D":
+                    filters.append(i)
+                else:
+                    filters.append(translate.index(i))
+            else:
+                print(f"Incorrect filter {i}")
+                return []
+        for i in self.pdict:
+                #flag = all([i[filters[e]] == values[e] for e in range(0, len(filters))])
+                flag = True
+                for f in range(0, len(filters)):
+                    if filters[f] == "D":
+                        d1, d2 = self.pdict[i[3]], self.pdict[i[4]] 
+                        if not(d1[1] in values[f] or d2[1] in values[f]):
+                            flag = flag and False
+                    elif i[filters[f]] != values[f]:
+                        flag = flag and False
+                if flag:       
+                    output.append(i)
+        return output
 
-# %% Track status of particles
-status_dict = {}
-def status_track(status):
-    if status in status_dict.keys():
-        status_dict[status] += 1
-    else: 
-        status_dict[status] = 1
+    def give_ds(self, e, limit = 20):
+        """
+        Backend function that returns daughter particles
+        """
+        d1 = self.pdict[e][3]
+        d2 = self.pdict[e][4]
+        lim = 0
+        while d1 == d2:
+            d2 = self.pdict[d1][4]
+            d1 = self.pdict[d1][3]
+            lim += 1
+            if lim == limit:
+                return 0, d1, d2
+        return 1, d1, d2
+    
+    def get_decays(self, PID, track = False):
+        """
+        Returns a dictionary containing PID and count of particles given arg PID decays into
+        """
+        vals = self.where(["PID"], [PID])
+        output = {}
+        for i in vals:
+            success, d1, d2 = self.give_ds(i[0])
+            ds = [i[3], i[4]]
+            ds = [self.pdict[m][1] for m in ds]
+            for m in ds:
+                output[m] = output.get(m, 0) + 1
+        return output
+    
+    def get_parents(self, elem):
+        """
+        Returns parent particle of given arg particle elem number
+        """
+        for i in self.dict:
+            if i[3] == elem or i[4] == elem:
+                return i
+
+    def get_info(self):
+        """
+        Returns dictionary count of all particles in dict
+        """
+        output = {}
+        for i in self.pdict:
+            output[i[1]] = output.get(i[1], 0) + 1
+        return output
+
+    def in_jet(self, jPhi, jEta):
+        """
+        Returns list of particles that are within the jet bounds
+        """
+        output = []
+        for elem in range(0, len(self.pdict)):
+            delt_r = np.sqrt(np.power(self.params[elem][0] - jPhi, 2) + np.power(self.params[elem][1] - jEta, 2))
+            if delt_r < 0.5:
+                output.append(self.pdict[elem])
+        return output
+
+    def find_event(self, PID, d_ref, status = None):
+        vals = self.where(["PID"])
+        
+def filter_func_blind(p_obj, jPhi, jEta):
+    """
+    File-blind filter that searches for all labels
+    """
+    H_parts = p_obj.where(["PID"], [25])
+    pass
+        
+
+    
+def filter_func(file, jPhi, jEta, p_obj):
+    def in_jet(elem):
+        delt_r = np.sqrt(np.power(p_obj.params[elem][0] - jPhi, 2) + np.power(p_obj.params[elem][1] - jEta, 2))
+        return delt_r < 0.5
+    def check_event(elem, PID, d1_ref, status = 0):
+        if p_obj.pdict[elem][1] == PID and in_jet(elem):
+            f, d1, d2 = p_obj.give_ds(elem)
+            if f:
+                if p_obj.pdict[d1][1] in d1_ref and  d1 == -d2 and in_jet(d1) and in_jet(d2):
+                    return True, [PID, d1, d2]
+        return False, []
+    fail = 0
+    for p in range(0, len(p_obj.pdict)):
+        if True:
+            if in_jet(p):
+                print(f"In {p_obj.pdict[p]}")
+            if check_event(p, 21, [5])[0]:
+
+                return 1
+            elif check_event(p, 25, [5])[0]:
+                return 0
+            else:
+                success, vals = check_event(p, 21, [1, 2, 3, 4, 6])
+                if success:
+                    return 2
+                else:
+                    fail += 1
+                return 3
+
+        elif file == "PROC_hbbwlnu":
+            if check_event(p, 25, [1, 2, 3, 4, 6]):
+                flag[25] += 1
+                flag[5] += 1
+                flag[-5] += 1
+        elif file == "PROC_ja":
+            flag[21] += 1
+            flag[1] += 1
+            flag[-1] += 1
+        else:
+            raise SyntaxError("Incorrect filename")
+        return 4
 #%%
+p_obj = ParticleDict(t)
+# %%
 # Loop over all events
 n=0
 num_vals = [0, 0, 0, 0]
