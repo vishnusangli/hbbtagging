@@ -2,14 +2,48 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from file_support import *
+
+def shift(val, lim):
+    if np.isnan(val):
+        return np.NaN
+    return val + lim
+shift = np.vectorize(shift)
+
+def custom_norm(val, min, gap, nanval = 0.):
+    if np.isnan(val):
+        return nanval
+    #val = val - min
+    else:
+        return np.divide(np.subtract(val, min) , gap)
+custom_norm = np.vectorize(custom_norm)
+
+def nanlog(val, e):
+    """
+    e is log(given val)
+    """
+    if val <= 0 or np.isnan(val):
+        return np.NaN
+    return np.log(val)/e
+nanlog = np.vectorize(nanlog)
+
+def filter_ignore(data, val = 0, ignore_nan = False):
+    values = []
+    for i in data.flatten():
+        if ignore_nan:
+            if not np.isnan(i):
+                values.append(i)
+        elif val != i:
+            values.append(i)
+    return values
+
 def plot_data(data, labels, shape = (5, 4), start = 0): 
-    plt.figure(figsize = (3 * shape[1], 3 * shape[2]))
-    for elem in range(0, shape[0] * shape[1]):
+    fig, ax = plt.subplots(shape[0], shape[1], figsize = (15, 15), sharey = True)
+    fig.patch.set_facecolor('grey')
+    for elem in range(1, (shape[0] * shape[1]) + 1):
         plt.subplot(shape[0], shape[1], elem)
         plt.grid(False)
         plt.xticks([])
         plt.yticks([])
-        
         plt.imshow(data[elem + start])
         plt.xlabel(f"{labels[elem + start]}")
 
@@ -25,7 +59,7 @@ def plot_performance(data, labels, predictions, shape = (5, 4), start = 0):
         str_val = f"{predictions[elem + start]}({labels[elem + start]})"
         plt.xlabel(str_val, color = 'green' if np.argmax(predictions[elem + start]) == labels[elem + start] else 'red')
         
-def shuffle_arrays(inputs, size = SIDE_SIZE,  seed = 0):
+def shuffle_arrays(inputs, secondaries, size = SIDE_SIZE,  seed = 0):
     """
     Shuffles a list of arrays in a single iteration (O(n) time).
 
@@ -51,7 +85,9 @@ def shuffle_arrays(inputs, size = SIDE_SIZE,  seed = 0):
             thresholds[i] = floor
 
     calc_threshold()
-    main_output = np.zeros((sum(rem_sizes), size, size))
+    temp = sum(rem_sizes)
+    main_output = np.zeros((temp, size, size))
+    main_secondary = np.zeros((temp, 1))
     main_elem = 0
     while sum(rem_sizes) != 0:
         rand_var = np.random.random()
@@ -61,10 +97,11 @@ def shuffle_arrays(inputs, size = SIDE_SIZE,  seed = 0):
                 choose_array = i
                 break
         main_output[main_elem] = inputs[choose_array][start_elems[choose_array]]
+        main_secondary[main_elem] = secondaries[choose_array][start_elems[choose_array]]
         start_elems[i] += 1
         main_elem += 1
         calc_threshold()
     if main_elem != main_output.shape[0]:
         print(f"Disparity in index: interated main index: {main_elem}, original calculated size: {main_output.shape[0]}")
         return 1, main_output
-    return 0, main_output
+    return 0, main_output, main_secondary

@@ -55,8 +55,12 @@ class EventData:
         pass
 
 
+# %%
 class ParticleDict:
     def __init__(self, t) -> None:
+        """
+        Particle Dictionary to better interact with event particles
+        """
         self.pdict = [] #PID, Status, Phi, Eta, D1, D2
         self.params = []
         i = 0
@@ -64,20 +68,27 @@ class ParticleDict:
             self.pdict.append([i, p.PID, p.Status, p.D1, p.D2])
             self.params.append([p.Phi, p.Eta])
             i += 1
-    def track(self, e, pflag = False, limit = 10):
+    def track(self, e, pflag = True, limit = 10):
+        """
+        Outputs the different entries of particles and the final daughters. \n
+        pflag: False removes verbose std output
+        """
         #tracks given particle until it decays into two diff
+        orig_pid = self.pdict[e][1]
         elems = [e]
         if pflag:
             print(self.pdict[e])
         d1 = self.pdict[e][3]
         d2 = self.pdict[e][4]
         lim = 0
-        while d1 == d2:
+        while d1 == d2 and d1 != -1:
             elems.append(d1)
+            if self.pdict[d1][1] != orig_pid:
+                break
             if pflag:
                 print(self.pdict[d1])
-            d1 = self.pdict[d1][3]
             d2 = self.pdict[d1][4]
+            d1 = self.pdict[d1][3]
             lim += 1
             if lim == limit:
                 print(f"Larger than func limit {limit}")
@@ -88,33 +99,198 @@ class ParticleDict:
         elems.append(d1)
         elems.append(d2)
         return elems
-    def where(self, params, values):
-        translate = ["Elem", "PID", "Status", "D1", "D2"]
+    def where(self, params, values, gen_track = False):
+        """
+        Filter function with given parameters: \n
+        "Elem" : pdict list element number \n
+        "PID": Particle PID \n
+        "Status": Particle Status \n
+        "D" List containing list of the daughter reg particles (abs) \n
+        (if single particle -- any, if double then exact)
+        """
+        translate = ["Elem", "PID", "Status", "D"]
         filters = []
         output = []
         for i in params:
             if i in translate:
-                filters.append(translate.index(i))
+                if i == "D":
+                    filters.append(i)
+                else:
+                    filters.append(translate.index(i))
             else:
                 print(f"Incorrect filter {i}")
                 return []
         for i in self.pdict:
-                flag = sum([i[filters[e]] == values[e] for e in range(0, len(filters))])
-                if flag:
+                #flag = all([i[filters[e]] == values[e] for e in range(0, len(filters))])
+                flag = True
+                for f in range(0, len(filters)):
+                    if filters[f] == "D":
+                        if gen_track:
+                            temp, d1, d2 = self.give_ds(i[0])
+                            d1, d2 = self.pdict[d1], self.pdict[d2]
+                        else:
+                            d1, d2 = self.pdict[i[3]], self.pdict[i[4]] 
+                        if not(d1[1] in values[f] or d2[1] in values[f]):
+                            flag = flag and False
+                    elif i[filters[f]] != values[f]:
+                        flag = flag and False
+                if flag:       
                     output.append(i)
         return output
 
-    def give_ds(self, e, limit = 20):
+    def give_ds(self, e, limit = 200):
+        """
+        Backend function that returns daughter particles
+        """
+        orig_pid = self.pdict[e][1]
         d1 = self.pdict[e][3]
         d2 = self.pdict[e][4]
         lim = 0
-        while d1 == d2:
-            d1 = self.pdict[d1][3]
+        while d1 == d2 and d1 != -1:
+            if self.pdict[d1][1] != orig_pid:
+                break
             d2 = self.pdict[d1][4]
+            d1 = self.pdict[d1][3]
             lim += 1
             if lim == limit:
-                return 1, d1, d2
-        return 0, d1, d2
+                return 0, d1, d2
+        return 1, d1, d2
+    
+    def get_decays(self, PID, track = False):
+        """
+        Returns a dictionary containing PID and count of particles given arg PID decays into
+        """
+        vals = self.where(["PID"], [PID])
+        output = {}
+        for i in vals:
+            success, d1, d2 = self.give_ds(i[0])
+            ds = [i[3], i[4]]
+            ds = [self.pdict[m][1] for m in ds]
+            for m in ds:
+                output[m] = output.get(m, 0) + 1
+        return output
+    
+    def get_parents(self, elem):
+        """
+        Returns parent particle of given arg particle elem number
+        """
+        ps = []
+        for i in self.pdict:
+            if i[3] == elem or i[4] == elem:
+                ps.append(i)
+        return ps
 
+    def get_info(self):
+        """
+        Returns dictionary count of all particles in dict
+        """
+        output = {}
+        for i in self.pdict:
+            output[i[1]] = output.get(i[1], 0) + 1
+        return output
 
+    def in_jet(self, jPhi, jEta):
+        """
+        Returns list of particles that are within the jet bounds
+        """
+        output = []
+        for elem in range(0, len(self.pdict)):
+            delt_r = np.sqrt(np.power(self.params[elem][0] - jPhi, 2) + np.power(self.params[elem][1] - jEta, 2))
+            if delt_r < 0.5:
+                output.append(self.pdict[elem])
+        return output
+
+    def p_in_jet(self, elem, jPhi, jEta):
+        delt_r = np.sqrt(np.power(self.params[elem][0] - jPhi, 2) + np.power(self.params[elem][1] - jEta, 2))
+        if delt_r < 0.5:
+            return True
+        
+def shortlist_particles(p_obj, gen_track = False):
+    """
+    shortlists all potential decay particles that could fall under some label \n
+    Found a gluon decaying into a single b-quark. Removing such events from given list will be beyond this function \n
+    Label 2 here refers to the original label 2 plan of g->any other quark. \n
+    gen_track: weather particle elements that continue throughout are evaluated with eventual daughters
+    """
+    def clean(l): #removing collision events
+        elem = 0
+        while elem < len(l):
+            if l[elem][3] == l[elem][4] or len(p_obj.get_parents(l[elem][3])) > 1 or len(p_obj.get_parents(l[elem][4])) > 1:
+                l.pop(elem)
+            else:
+                elem += 1
+
+    label_0 = p_obj.where(["PID", "D"], [25, [5]], gen_track)
+    clean(label_0)
+    label_1 = p_obj.where(["PID", "D"], [21, [5]], gen_track)
+    clean(label_1)
+    label_2 = p_obj.where(["PID", "D"], [21, [1, 2, 3, 4, 6]], gen_track)
+    clean(label_2)
+    return label_0, label_1, label_2
+
+def filter_blind(p_obj, label_0, label_1, label_2, jPhi, jEta):
+    """
+    File-blind function that returns label based on distance to jet \n
+    Need to remove faulty decay events like the g->b here ------ *Imp*
+    """
+    for elem in label_0:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
+            return 0
+    for elem in label_1:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
+            return 1
+    return 2     
+
+def filter_func(file, jPhi, jEta, p_obj):
+    pass
+
+def gbba_shortlist(p_obj, gen_track = False):
+    """
+    Personalized gbba shortlist. Includes separate label lists for H, b, b'
+    """
+    def clean(l): #removing collision events
+        elem = 0
+        while elem < len(l):
+            if l[elem][3] == l[elem][4] or len(p_obj.get_parents(l[elem][3])) > 1 or len(p_obj.get_parents(l[elem][4])) > 1:
+                l.pop(elem)
+            else:
+                elem += 1
+
+    label_0 = p_obj.where(["PID", "D"], [25, [5]], gen_track)
+    clean(label_0)
+
+    label_1H = p_obj.where(["PID"], [21], gen_track)
+    clean(label_1H)
+    label_1B = p_obj.where(["PID"], [5], gen_track)
+    clean(label_1B)
+    label_1BB = p_obj.where(["PID"], [-5], gen_track)
+    clean(label_1BB)
+
+    label_2 = p_obj.where(["PID", "D"], [21, [1, 2, 3, 4, 6]], gen_track)
+    clean(label_2)
+    return label_0, label_1H, label_1B, label_1BB, label_2
+
+def gbba_filter(p_obj, label_0, label_1H, label_1B, label_1BB, label_2, jPhi, jEta):
+    """
+    Personalized gbba filter. Checks for any
+    """
+    for elem in label_0:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
+            return 0
+    flag_1 = [0, 0 , 0]
+    for elem in label_1H:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
+            flag_1[0] = 1
+            break
+    for elem in label_1B:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
+            flag_1[1] = 1
+            break
+    for elem in label_1BB:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
+            flag_1[2] = 1
+            break
+    if all(flag_1):
+        return 1
+    return 2     
 # %%
