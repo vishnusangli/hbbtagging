@@ -12,7 +12,7 @@ import time
 #Directory and label file selection
 BGROUND_Label = {0:[1, 2]}
 M_SIG_Label = {0:[0, 2]}
-I_SIG_Label = {0:[1, 2]}
+I_SIG_Label = {0:[2]}
 MODELTYPE = 'cnn'
 # Retrieve Datasets
 dataset_arr = []
@@ -51,48 +51,32 @@ def try_1(sep):
     inter = np.multiply(sep, -1)
     inter = shift(inter,1 - np.nanmin(inter))
     inter = np.log2(inter)
-    inter = 1 - custom_norm(inter, -1, np.nanmax(inter)+ 1, 1.)
+    inter = 1 - custom_norm(inter, -1.5, np.nanmax(inter)+ 1.5, 1.)
     return inter
+
 master_data = try_1(master_data)
-def try_2(sep):
-    pass
-# %%
-master_data = shift(master_data, 2 - global_min)
-master_data = nanlog(master_data, np.log(2)) 
-new_global_max = np.nanmax(master_data)
-master_data = custom_norm(master_data, 0, new_global_max)
+def try_2(master_data):
+    master_data = shift(master_data, 2 - global_min)
+    master_data = nanlog(master_data, np.log(2)) 
+    new_global_max = np.nanmax(master_data)
+    master_data = custom_norm(master_data, 0, new_global_max)
 # %% Print images
 plot_data(master_data, master_label, shape = (5, 4), start = 0)
 
 # %% Basic model
 model = tf.keras.Sequential([
-    tf.keras.layers.Flatten(input_shape=(1, 30, 30)),
-    #tf.keras.layers.Dense(300, activation=tf.nn.relu),
-    tf.keras.layers.Dense(128, activation=tf.nn.selu),
-    tf.keras.layers.Dense(128, activation=tf.nn.softmax),
+    tf.keras.layers.Flatten(input_shape=(30, 30)),
+    tf.keras.layers.Dense(128, activation=tf.nn.softplus),
+    tf.keras.layers.Dense(60, activation=tf.nn.relu),
     tf.keras.layers.Dense(3, activation=tf.nn.softmax)
 ])
 #4 output neurons with softmax or adjusted perceptron threshold (messed idea but worth if viable computation availability)
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-              metrics=['accuracy'])
+              metrics=['accuracy', "sparse_categorical_accuracy"])
 # %% 
 # Train/test split data
 BATCH_SIZE = 30 #
-def split_data(data, labels, train_ratio = 0.8):
-    """
-    lower bound value
-    """
-    train_elems = int(np.multiply(data.shape[0], train_ratio))
-    train_data, train_label = data[0:train_elems], labels[0:train_elems]
-    test_data, test_labels = data[train_elems:], labels[train_elems:]
-    print(f"{train_data.shape[0]}:{test_data.shape[0]}")
-    return train_data, train_label, test_data, test_labels
-
-def count_labels(labels):
-    to_return = {0:0, 1:0, 2:0}
-    for i in labels:
-        to_return[i[0]] += 1
 train_data, train_label, test_data, test_label = split_data(master_data, master_label, train_ratio=0.8)
 # %%
 # fit model
@@ -122,6 +106,22 @@ test_acc = 0
 for i in range(0, len(predicted_labels)):
     if predicted_labels[i] == test_label[i]:
         test_acc += 1
+test_acc /= len(predicted_labels)
+
+# %%
+def calc_prec_recall(label, prediction, choose_label):
+    tp = 0
+    fp = 0
+    fn = 0
+    for i in range(0, len(label)):
+        if label[i] == choose_label:
+            if prediction[i] == choose_label:
+                tp += 1
+            else:
+                fn += 1
+        elif prediction[i] == choose_label:
+            fp += 1
+    return np.divide(tp, tp + fp), np.divide(tp, tp + fn)
 # %%
 #Confusion Matrix
 confusion_mat = tf.math.confusion_matrix(
@@ -129,16 +129,16 @@ confusion_mat = tf.math.confusion_matrix(
     name=None
 )
 plt.imshow(confusion_mat, )
-plt.xticks(np.arange(0, 4, 1))
+plt.xticks([0, 1, 2])
 plt.xlabel("Prediction")
-plt.yticks(np.arange(0, 4, 1))
+plt.yticks([2, 1, 0])
 plt.ylabel("Label")
 plt.colorbar()
 plt.title("Confusion Matrix")
 # %%
 import time
 temp = time.localtime()
-tf.keras.models.save_model( model, f"../models/cnn/first", overwrite=True,)
+tf.keras.models.save_model( model, f"../models/cnn/{temp.tm_mon}-{temp.tm_mday}", overwrite=True,)
 
 # %%
 to_return = {0:0, 1:0, 2:0}

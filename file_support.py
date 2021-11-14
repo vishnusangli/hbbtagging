@@ -215,20 +215,25 @@ def shortlist_particles(p_obj, gen_track = False):
     def clean(l): #removing collision events
         elem = 0
         while elem < len(l):
-            if l[elem][3] == l[elem][4] or len(p_obj.get_parents(l[elem][3])) > 1 or len(p_obj.get_parents(l[elem][4])) > 1:
+            if len(p_obj.get_parents(l[elem][3])) > 1 or len(p_obj.get_parents(l[elem][4])) > 1:
                 l.pop(elem)
             else:
                 elem += 1
+    #Higgs decaying into bb
+    label_0 = p_obj.where(["PID", "Status"], [25, 62])
 
-    label_0 = p_obj.where(["PID", "D"], [25, [5]], gen_track)
-    clean(label_0)
-    label_1 = p_obj.where(["PID", "D"], [21, [5]], gen_track)
-    clean(label_1)
-    label_2 = p_obj.where(["PID", "D"], [21, [1, 2, 3, 4, 6]], gen_track)
-    clean(label_2)
-    return label_0, label_1, label_2
+    #uu' colliding forming g that decays into bb'
+    #uu' collision event gives bb' status 23
+    b_5 = p_obj.where(["PID", "Status"], [5, 23])
+    bb_5 = p_obj.where(["PID", "Status"], [-5, 23])
+    gluons = p_obj.where(["PID"], [21])
+    label_1 = [b_5, bb_5, gluons]
 
-def filter_blind(p_obj, label_0, label_1, label_2, jPhi, jEta):
+    #label_2 = p_obj.where(["PID", "D"], [21, [1, 2, 3, 4, 6]], gen_track)
+    #clean(label_2)
+    return label_0, label_1
+
+def filter_blind(p_obj, label_0, label_1, jPhi, jEta):
     """
     File-blind function that returns label based on distance to jet \n
     Need to remove faulty decay events like the g->b here ------ *Imp*
@@ -236,9 +241,14 @@ def filter_blind(p_obj, label_0, label_1, label_2, jPhi, jEta):
     for elem in label_0:
         if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
             return 0
-    for elem in label_1:
-        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
-            return 1
+    label1_conf = [0, 0, 0]
+    for part in range(0, len(label_1)):
+        for elem in label_1[part]:
+            if p_obj.p_in_jet(elem[0], jPhi, jEta):
+                label1_conf[part] = 1
+                break
+    if all(label1_conf):
+        return 1
     return 2     
 
 def filter_func(file, jPhi, jEta, p_obj):

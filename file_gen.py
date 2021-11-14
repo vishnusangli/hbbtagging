@@ -19,14 +19,14 @@ M_SIG = ["PROC_hbbwlnu"]
 I_SIG = ["PROC_ja"]
 FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
 
-CURRFILE = M_SIG[0]
+CURRFILE = I_SIG[0]
 fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
 t.Show()
 # %% 
 # Create an empty image corresponding to eta/phi
-check = []
+
 etamin=-1.5
 etamax= 1.5
 etabin=30
@@ -37,7 +37,7 @@ phimax=1.5
 phibin=30
 phiwdt=(phimax-phimin)/phibin
 
-img_sizes = [9960, 21, 545, 7870]
+img_sizes = [0, 0, 21481]
 image0 = np.zeros(( (img_sizes[0]) + 1,etabin,phibin), dtype=float)
 image1 = np.zeros(( (img_sizes[1]) + 1,etabin,phibin), dtype=float)
 image2 = np.zeros(( (img_sizes[2]) + 1,etabin,phibin), dtype=float)
@@ -50,7 +50,7 @@ n=0
 for e in t:
     # Loop over all jets in the event
     p_obj = ParticleDict(e)
-    label_0, label_1, label_2 = shortlist_particles(p_obj, False)
+    label_0, label_1 = shortlist_particles(p_obj, False)
     for fj in e.GenFatJet:
         ## Homework 2
         # Add labelling information based on:
@@ -59,7 +59,7 @@ for e in t:
         # 2: contains a gluon and any non-b quark
         # 3: others
         
-        label = filter_blind(p_obj, label_0, label_1, label_2, fj.Phi, fj.Eta)
+        label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
         img_use = image2[elem_num[2]]
         if label == 0: 
             img_use = image0[elem_num[0]]
@@ -74,7 +74,7 @@ for e in t:
         for c in fj.Constituents:
             myeta= int(np.floor((c.Eta - fj.Eta - etamin)/etawdt)) 
             myphi= int(np.floor((c.Phi - fj.Phi - phimin)/phiwdt)) 
-            check.append([myeta, myphi, c.PT])
+            #check.append([myeta, myphi, c.PT])
             # Bounds check
             if myeta < 0 or myeta >= img_use.shape[0]:
                 continue
@@ -87,17 +87,17 @@ for e in t:
         if n % 1000 == 0:
             print(f"{n} Done: {elem_num}")
 print("Done with Iteration")
-print(image0.shape)
-print(image1.shape)
-print(image2.shape)
-
+print(f"End count: {elem_num}")
+print(f"Label 0 shape: {image0.shape}")
+print(f"Label 1 shape: {image1.shape}")
+print(f"Label 2 shape: {image2.shape}")
 # %%
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex = True, sharey = True)
 im = ax1.imshow(log10(image0[0]),extent=(etamin,etamax,phimin,phimax))
 ax1.set_title("0: Hbb")
-im = ax2.imshow(log10(image1[1]),extent=(etamin,etamax,phimin,phimax))
+im = ax2.imshow(log10(image1[0]),extent=(etamin,etamax,phimin,phimax))
 ax2.set_title("1: gbb")
-im = ax3.imshow(log10(image2[1]),extent=(etamin,etamax,phimin,phimax))
+im = ax3.imshow(log10(image2[0]),extent=(etamin,etamax,phimin,phimax))
 ax3.set_title("2: g*")
 plt.suptitle(f"{CURRFILE} Example jet substructure")
 fig.subplots_adjust(right=0.8)

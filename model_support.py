@@ -105,3 +105,19 @@ def shuffle_arrays(inputs, secondaries, size = SIDE_SIZE,  seed = 0):
         print(f"Disparity in index: interated main index: {main_elem}, original calculated size: {main_output.shape[0]}")
         return 1, main_output
     return 0, main_output, main_secondary
+
+def split_data(data, labels, train_ratio = 0.8):
+    """
+    lower bound value
+    """
+    train_elems = int(np.multiply(data.shape[0], train_ratio))
+    train_data, train_label = data[0:train_elems], labels[0:train_elems]
+    test_data, test_labels = data[train_elems:], labels[train_elems:]
+    print(f"{train_data.shape[0]}:{test_data.shape[0]}")
+    return train_data, train_label, test_data, test_labels
+
+def count_labels(labels):
+    to_return = {0:0, 1:0, 2:0}
+    for i in labels:
+        to_return[int(i[0])] += 1
+    return to_return

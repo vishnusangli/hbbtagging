@@ -17,7 +17,7 @@ M_SIG = ["PROC_hbbwlnu"]
 I_SIG = ["PROC_ja"]
 FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
 
-CURRFILE = BGROUND[0]
+CURRFILE = I_SIG[0]
 fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
@@ -47,7 +47,7 @@ quit = False
 for e in t:
     # Loop over all jets in the event
     p_obj = ParticleDict(e)
-    label_0, label_1h, label_1b, label_1bb, label_2 = gbba_shortlist(p_obj, False)
+    label_0, label_1 = shortlist_particles(p_obj, True)
     for fj in e.GenFatJet:
         ## Homework 2
         # Add labelling information based on:
@@ -75,7 +75,7 @@ for e in t:
         #PDGID - 1d, 2u, 3s, 4c, 5b, 6t
         #21 - g
         #25 - H
-        label = gbba_filter(p_obj, label_0, label_1h, label_1b, label_1bb, label_2, fj.Phi, fj.Eta)
+        label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
         
         if label == 0: 
             num_vals[0] += 1
@@ -125,7 +125,7 @@ plt.xlabel('$\eta$')
 plt.ylabel('$\phi$')
 plt.colorbar()
 plt.title(f"{CURRFILE} Average jet substructure")
-#plt.savefig(f"{DATA_DIR}/{CURRFILE}/total.png", facecolor = 'white', edgecolor = 'white')
+plt.savefig(f"{DATA_DIR}/{CURRFILE}/total.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
 # %%
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey = True)
@@ -136,8 +136,8 @@ ax2.set_title("1: gbb")
 im = ax3.imshow(log10(image2),extent=(etamin,etamax,phimin,phimax))
 ax3.set_title("2: other")
 fig.subplots_adjust(right=0.8)
-fig.colorbar(im, ax = [(ax1), (ax2), (ax3)])
-#plt.savefig(f"{DATA_DIR}/{CURRFILE}/labels.png", facecolor = 'white', edgecolor = 'white')
+fig.colorbar(im, ax = [ax1, ax2, ax3])
+plt.savefig(f"{DATA_DIR}/{CURRFILE}/labels.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
 
 # %%
@@ -145,11 +145,12 @@ i = 0
 labels = []
 for e in t:
     p_obj = ParticleDict(e)
-    label_0, label_1, label_2 = shortlist_particles(p_obj, False)
+    label_0, label_1 = shortlist_particles(p_obj, True)
     for fj in e.GenFatJet:
-        labels.append(filter_blind(p_obj, label_0, label_1, label_2, fj.Phi, fj.Eta))
+
+        labels.append(filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta))
     i += 1
-    if i == 3:
+    if i == 30:
         break
 # %%
 p_obj = ParticleDict(t)
