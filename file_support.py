@@ -195,13 +195,14 @@ class ParticleDict:
         """
         output = []
         for elem in range(0, len(self.pdict)):
-            delt_r = np.sqrt(np.power(self.params[elem][0] - jPhi, 2) + np.power(self.params[elem][1] - jEta, 2))
+            delt_r = np.sqrt(np.power(angle_diff(jPhi, self.params[elem][0]), 2) + np.power(self.params[elem][1] - jEta, 2))
             if delt_r < 0.5:
                 output.append(self.pdict[elem])
         return output
 
     def p_in_jet(self, elem, jPhi, jEta):
-        delt_r = np.sqrt(np.power(self.params[elem][0] - jPhi, 2) + np.power(self.params[elem][1] - jEta, 2))
+        #angle_diff(jPhi, self.params[elem][0])
+        delt_r = np.sqrt(np.power(angle_diff(jPhi, self.params[elem][0]), 2) + np.power(self.params[elem][1] - jEta, 2))
         if delt_r < 0.5:
             return True
         
@@ -226,8 +227,7 @@ def shortlist_particles(p_obj, gen_track = False):
     #uu' collision event gives bb' status 23
     b_5 = p_obj.where(["PID", "Status"], [5, 23])
     bb_5 = p_obj.where(["PID", "Status"], [-5, 23])
-    gluons = p_obj.where(["PID"], [21])
-    label_1 = [b_5, bb_5, gluons]
+    label_1 = [b_5, bb_5]
 
     #label_2 = p_obj.where(["PID", "D"], [21, [1, 2, 3, 4, 6]], gen_track)
     #clean(label_2)
@@ -241,66 +241,55 @@ def filter_blind(p_obj, label_0, label_1, jPhi, jEta):
     for elem in label_0:
         if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
             return 0
-    label1_conf = [0, 0, 0]
-    for part in range(0, len(label_1)):
-        for elem in label_1[part]:
-            if p_obj.p_in_jet(elem[0], jPhi, jEta):
-                label1_conf[part] = 1
-                break
+    label1_conf = [0, 0]
+    for elem in label_1[0]:
+        if p_obj.p_in_jet(elem[0], jPhi, jEta):
+            label1_conf[0] = 1
+
+    for elem in label_1[1]:
+        if p_obj.p_in_jet(elem[1], jPhi, jEta):
+            label1_conf[1] = 1
+
     if all(label1_conf):
         return 1
     return 2     
 
-def filter_func(file, jPhi, jEta, p_obj):
-    pass
-
-def gbba_shortlist(p_obj, gen_track = False):
+def biased_shortlist(p_obj, file):
     """
-    Personalized gbba shortlist. Includes separate label lists for H, b, b'
+    Biased shortlist function to ensure label 0 fail don't become label 1 (Higgs decays into bb w/ status 23)
     """
-    def clean(l): #removing collision events
-        elem = 0
-        while elem < len(l):
-            if l[elem][3] == l[elem][4] or len(p_obj.get_parents(l[elem][3])) > 1 or len(p_obj.get_parents(l[elem][4])) > 1:
-                l.pop(elem)
-            else:
-                elem += 1
+    desired_label = 2
+    if file in BGROUND:
+        desired_label = 1
+    elif file in M_SIG:
+        desired_label = 0
 
-    label_0 = p_obj.where(["PID", "D"], [25, [5]], gen_track)
-    clean(label_0)
-
-    label_1H = p_obj.where(["PID"], [21], gen_track)
-    clean(label_1H)
-    label_1B = p_obj.where(["PID"], [5], gen_track)
-    clean(label_1B)
-    label_1BB = p_obj.where(["PID"], [-5], gen_track)
-    clean(label_1BB)
-
-    label_2 = p_obj.where(["PID", "D"], [21, [1, 2, 3, 4, 6]], gen_track)
-    clean(label_2)
-    return label_0, label_1H, label_1B, label_1BB, label_2
-
-def gbba_filter(p_obj, label_0, label_1H, label_1B, label_1BB, label_2, jPhi, jEta):
+    if desired_label == 0:
+        label_0 = p_obj.where(["PID", "Status"], [25, 62])
+        return label_0, [[], []]
+    elif desired_label == 1:
+        b_5 = p_obj.where(["PID", "Status"], [5, 23])
+        bb_5 = p_obj.where(["PID", "Status"], [-5, 23])
+        label_1 = [b_5, bb_5]
+        return [], label_1
+    return [], [[], []]
+# %%
+double_pi = 2 * np.pi
+def angle_diff(p1, p2, rad = True):
     """
-    Personalized gbba filter. Checks for any
+    Returns absolute difference between two angles in radidans \n
+    form: p2 - p1
     """
-    for elem in label_0:
-        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
-            return 0
-    flag_1 = [0, 0 , 0]
-    for elem in label_1H:
-        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
-            flag_1[0] = 1
-            break
-    for elem in label_1B:
-        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
-            flag_1[1] = 1
-            break
-    for elem in label_1BB:
-        if p_obj.p_in_jet(elem[0], jPhi, jEta) and p_obj.p_in_jet(elem[3], jPhi, jEta) and p_obj.p_in_jet(elem[4], jPhi, jEta):
-            flag_1[2] = 1
-            break
-    if all(flag_1):
-        return 1
-    return 2     
+    if not rad:
+        p1 = p1 * (np.pi/180)
+        p2 = p2 * (np.pi/180)
+    temp = p2 - p1
+
+    temp -= (double_pi * (temp//double_pi))
+    if temp > np.pi:
+        temp -= double_pi
+    
+    if not rad:
+        temp = temp * (180/np.pi)
+    return temp
 # %%

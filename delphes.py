@@ -17,7 +17,7 @@ M_SIG = ["PROC_hbbwlnu"]
 I_SIG = ["PROC_ja"]
 FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
 
-CURRFILE = I_SIG[0]
+CURRFILE = BGROUND[0]
 fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
@@ -44,10 +44,13 @@ image2 = np.zeros((etabin,phibin), dtype=float)
 n=0
 num_vals = [0, 0, 0]
 quit = False
+leading_jets = True
 for e in t:
     # Loop over all jets in the event
     p_obj = ParticleDict(e)
     label_0, label_1 = shortlist_particles(p_obj, True)
+
+    jet_num = 0
     for fj in e.GenFatJet:
         ## Homework 2
         # Add labelling information based on:
@@ -93,8 +96,9 @@ for e in t:
             ## Homework 1
             # Change this to be the distance from the fat jet center.
             # ie: delta eta = c.Eta - fj.Eta
+            
             myeta= int(np.floor((c.Eta - fj.Eta - etamin)/etawdt)) 
-            myphi= int(np.floor((c.Phi - fj.Phi - phimin)/phiwdt)) 
+            myphi= int(angle_diff(phimin, angle_diff(fj.Phi, c.Phi))/phiwdt)
             #check.append([myeta, myphi, c.PT])
             # Bounds check
             if myeta < 0 or myeta >= image.shape[0]:
@@ -108,6 +112,10 @@ for e in t:
         n+=1
         if n % 1000 == 0:
             print(f"{n} Done: {num_vals}")
+
+        jet_num += 1
+        if leading_jets and jet_num == 2:
+            break
     if quit:
         break
 
@@ -150,7 +158,7 @@ for e in t:
 
         labels.append(filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta))
     i += 1
-    if i == 30:
+    if i == 3:
         break
 # %%
 p_obj = ParticleDict(t)

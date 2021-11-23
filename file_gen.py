@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import time
+
+from tensorflow.python.ops.ragged.ragged_array_ops import size
 from file_support import *
 # %% Add Delphes library
 ROOT.gSystem.Load(f'libDelphes')
@@ -25,6 +27,32 @@ t = fh.Get('Delphes')
 
 t.Show()
 # %% 
+#Obtain label sizes and conf..
+get_leading = True
+size_labels = [0, 0, 0]
+print("Scan Start")
+n = 0
+for e in t:
+    p_obj = ParticleDict(e)
+    label_0, label_1 = biased_shortlist(p_obj, CURRFILE)
+    num_jet = 0
+
+    for fj in e.GenFatJet:
+        label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
+        if label == 0: 
+            size_labels[0] += 1
+        elif label == 1:
+            size_labels[1] += 1
+        else:
+            size_labels[2] += 1
+
+        n += 1
+        num_jet += 1
+
+        if get_leading and num_jet == 2:
+            break
+print(size_labels)
+#%%
 # Create an empty image corresponding to eta/phi
 
 etamin=-1.5
@@ -37,7 +65,7 @@ phimax=1.5
 phibin=30
 phiwdt=(phimax-phimin)/phibin
 
-img_sizes = [0, 0, 21481]
+img_sizes = size_labels
 image0 = np.zeros(( (img_sizes[0]) + 1,etabin,phibin), dtype=float)
 image1 = np.zeros(( (img_sizes[1]) + 1,etabin,phibin), dtype=float)
 image2 = np.zeros(( (img_sizes[2]) + 1,etabin,phibin), dtype=float)
@@ -47,10 +75,13 @@ elem_num = [0, 0, 0]
 temp = time.localtime()
 print(f"Start time: {temp.tm_hour}:{temp.tm_min}:{temp.tm_mon}")
 n=0
+leading_jets = True
 for e in t:
     # Loop over all jets in the event
     p_obj = ParticleDict(e)
-    label_0, label_1 = shortlist_particles(p_obj, False)
+    label_0, label_1 = biased_shortlist(p_obj, CURRFILE)
+
+    jet_num = 0
     for fj in e.GenFatJet:
         ## Homework 2
         # Add labelling information based on:
@@ -73,7 +104,7 @@ for e in t:
         # Loop over all particles in the jet
         for c in fj.Constituents:
             myeta= int(np.floor((c.Eta - fj.Eta - etamin)/etawdt)) 
-            myphi= int(np.floor((c.Phi - fj.Phi - phimin)/phiwdt)) 
+            myphi= int(angle_diff(phimin, angle_diff(fj.Phi, c.Phi))/phiwdt)
             #check.append([myeta, myphi, c.PT])
             # Bounds check
             if myeta < 0 or myeta >= img_use.shape[0]:
@@ -86,6 +117,10 @@ for e in t:
         n+=1
         if n % 1000 == 0:
             print(f"{n} Done: {elem_num}")
+
+        jet_num += 1
+        if leading_jets and jet_num == 2:
+            break
 print("Done with Iteration")
 print(f"End count: {elem_num}")
 print(f"Label 0 shape: {image0.shape}")
@@ -109,4 +144,20 @@ np.save(f"{DATA_DIR}/{CURRFILE}/label_0", image0)
 np.save(f"{DATA_DIR}/{CURRFILE}/label_1", image1)
 np.save(f"{DATA_DIR}/{CURRFILE}/label_2", image2)
 
+# %%
+i = 0
+labels = []
+stop = False
+for e in t:
+    p_obj = ParticleDict(e)
+    label_0, label_1 = shortlist_particles(p_obj, True)
+    for fj in e.GenFatJet:
+        label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
+        labels.append(label)
+        if label == 1:
+            stop = True
+            break
+    if stop:
+        break
+    i += 1
 # %%
