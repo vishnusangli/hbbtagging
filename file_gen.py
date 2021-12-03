@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import time
-
+import pandas as pd
 from tensorflow.python.ops.ragged.ragged_array_ops import size
 from file_support import *
 # %% Add Delphes library
@@ -115,6 +115,8 @@ for e in t:
             # Add to image
             img_use[myeta, myphi] += c.PT
         n+=1
+            
+
         if n % 1000 == 0:
             print(f"{n} Done: {elem_num}")
 
@@ -160,4 +162,35 @@ for e in t:
     if stop:
         break
     i += 1
+# %%
+# Jet Tau, PT and EhadOverEem variable loop
+auxiliary_vals = np.zeros((n + 1, 8))
+elem_num = 0
+leading_jets = True
+for e in t:
+    p_obj = ParticleDict(e)
+    label_0, label_1 = biased_shortlist(p_obj, CURRFILE)
+
+    jet_num = 0
+    for fj in e.GenFatJet:
+        label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
+        temp = []
+        iter = 0
+        for i in fj.Tau:
+            auxiliary_vals[elem_num, iter] = i
+            iter+= 1
+        auxiliary_vals[elem_num, 5] = fj.PT
+        auxiliary_vals[elem_num, 6] = fj.EhadOverEem
+        auxiliary_vals[elem_num, 7] = label
+        elem_num += 1
+        jet_num += 1
+        if leading_jets and jet_num == 2:
+            break
+
+# %%
+#Save misc_features array
+temp = pd.DataFrame(auxiliary_vals, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
+temp.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(temp))])
+# %%
+temp.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features.parquet", engine="pyarrow")
 # %%

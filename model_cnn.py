@@ -1,7 +1,7 @@
 # %% Imports 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import datasets, layers, models
+from tensorflow.keras import datasets, layers, models, backend
 import matplotlib.pyplot as plt
 from file_support import *
 from model_support import *
@@ -56,11 +56,18 @@ def try_2(master_data):
     master_data = nanlog(master_data, np.log(2)) 
     new_global_max = np.nanmax(master_data)
     master_data = custom_norm(master_data, 0, new_global_max)
+    return master_data
+
+def try_3(sep):
+    pass
 
 master_data = try_1(master_data)
 # %% 
 # Print images
 plot_data(master_data, master_label, shape = (5, 4), start = 0)
+
+# %%
+#Create custom metric, loss functions?
 
 # %% Basic model
 model = tf.keras.Sequential([
@@ -156,24 +163,6 @@ label_0 = np.array(label_0)
 label_1 = np.array(label_1)
 label_2 = np.array(label_2)
 
-def generate_outline_hist(bins, height):
-    x_res = np.zeros(shape = (2*len(height) + 2))
-    y_res = np.zeros(shape = (2*len(height) + 2))
-    width = bins[1] - bins[0]
-    #Start case
-    x_res[0] = bins[0]
-    y_res[0] = 0
-    index_num = 1
-    for i in range(0, len(n) - 1):
-        x_res[index_num] = bins[i]
-        x_res[index_num + 1] = bins[i + 1]
-        y_res[index_num] = height[i]
-        y_res[index_num + 1] = height[i]
-        index_num += 2
-    x_res[-1] = bins[-1]
-    y_res[-1] = 0
-    return x_res, y_res
-
 num_bins = 40
 disc_range = (min(disc_vals), max(disc_vals))
 hist_0, n = np.histogram(label_0, bins = num_bins, range = disc_range)
@@ -201,19 +190,6 @@ plt.tight_layout()
 plt.legend()
 
 # %%
-def eff_rej_calc(label_0, label_1, label_2, rej = True):
-    if rej:
-        rej_1 = [(label_1 < i).sum()/len(label_1) for i in label_0]
-        rej_2 = [(label_2 < i).sum()/len(label_2) for i in label_0]
-        x = [(label_0 > i).sum()/len(label_0) for i in label_0]
-        return x, rej_1, rej_2
-    else:
-        rej_1 = [(label_1 >= i).sum()/len(label_1) for i in label_0]
-        rej_2 = [(label_2 >= i).sum()/len(label_2) for i in label_0]
-        x = [(label_0 > i).sum()/len(label_0) for i in label_0]
-        return x, rej_1, rej_2  
-
-# %%
 #Obtain Rejection rates
 label_0.sort()
 rej = True
@@ -235,15 +211,10 @@ plt.grid()
 plt.tight_layout()
 plt.show()
 #%%
+# Get hist distributions of 
+# %%
 #Calculate predicted label based on discriminant
 predicted_labels = []
-
-# %%
-def calc_prec_recall(true_label, prediction, choose_label):
-    tp = ((prediction == choose_label) & (true_label == choose_label)).sum()
-    fp = ((prediction == choose_label) & (true_label != choose_label)).sum()
-    fn = ((prediction != choose_label) & (true_label == choose_label)).sum()
-    return np.divide(tp, tp + fp), np.divide(tp, tp + fn)
 
 
 # %%
