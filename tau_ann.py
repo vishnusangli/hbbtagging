@@ -10,34 +10,32 @@ import time
 import pandas as pd
 # %%
 #Directory and label file selection
-BGROUND_Label = [0]
-M_SIG_Label = [0]
-I_SIG_Label = [0]
+BGROUND_Label = {0:[1]}
+M_SIG_Label = {0:[0]}
+I_SIG_Label = {0:[2]}
 MODELTYPE = 'tau-ann'
-
 # Retrieve Datasets
 dataset_arr = []
 code_arr = []
-ref = [BGROUND_Label, M_SIG_Label, I_SIG_Label]
-for elem in range(0,3):
-    ev_type = ref[elem]
-    if elem == 0:
+for ev_type in [BGROUND_Label, M_SIG_Label, I_SIG_Label]:
+    if ev_type == BGROUND_Label:
         ev_dir = BGROUND
-    elif elem == 1:
+    elif ev_type == M_SIG_Label:
         ev_dir = M_SIG
     else:
         ev_dir = I_SIG
-    for event in ev_type:
-        print(ev_dir[event])
-        curr_arr = pd.read_parquet(f"{DATA_DIR}/{ev_dir[event]}/misc_features.parquet", engine="pyarrow")
-        curr_code = np.array(curr_arr.pop('code'))
-        curr_arr = np.array(curr_arr)
-        dataset_arr.append(curr_arr)
-        code_arr.append(curr_code)
+    for event in ev_type.keys():
+        for label in ev_type[event]:
+            print(ev_dir[event], label)
+            curr_arr = pd.read_parquet(f"{DATA_DIR}/{ev_dir[event]}/misc_features_{label}.parquet", engine="pyarrow")
+            curr_code = np.array(curr_arr.pop('code'))
+            dataset_arr.append(np.array(curr_arr))
+            code_arr.append(curr_code)
+
 
 success, parent_data, code_label = shuffle_arrays(dataset_arr, code_arr, shape = [dataset_arr[0].shape[1]])
 master_label, master_data = parent_data[:, -1], parent_data[:, :-1]
-
+count_labels(master_label)
 # %% Basic model
 model = tf.keras.Sequential([
     tf.keras.layers.Dense(7, activation=tf.nn.relu),
@@ -51,6 +49,7 @@ model.compile(optimizer='adam',
 # %% 
 # Train/test split data
 train_data, train_label, test_data, test_label = split_data(master_data, master_label, train_ratio=0.8)
+count_labels(train_label), count_labels(test_label)
 # %%
 # %%
 # fit model
@@ -63,7 +62,7 @@ model.fit(x = first, y = train_label[0:lim], validation_data = (test_data[0:lim]
 plot_accuracy_loss(model, NUM_EPOCHS)
 # %%
 # Predict on test data
-num_do = 100 #test_label.shape[0]
+num_do = test_label.shape[0]
 model_predictions = np.zeros(shape = (test_label.shape[0], 3))
 for i in range(0, num_do):
     model_predictions[i] = model.predict(np.reshape(test_data[i], (1, 7)) ) 
@@ -89,4 +88,8 @@ disc_vals = np.array([disc_var(model_predictions[i], 0.9) for i in range(0, mode
 # %%
 n, hist_0, hist_1, hist_2 =  generate_labelhist(disc_vals, test_label)
 plt_hist(n, hist_0, hist_1, hist_2)
+# %%
+# %%
+temp = time.localtime()
+tf.keras.models.save_model( model, f"../models/{MODELTYPE}/{temp.tm_mon}-{temp.tm_mday}", overwrite=True,)
 # %%

@@ -87,7 +87,7 @@ def shuffle_arrays(inputs, secondaries, shape = (SIDE_SIZE, SIDE_SIZE),  seed = 
     calc_threshold()
     temp = sum(rem_sizes)
     main_output = np.zeros((temp, *shape))
-    main_secondary = np.empty(shape = (temp, 1), dtype=type(secondaries[0][0]))
+    main_secondary = np.empty(shape = (temp, secondaries[0][0].shape[0]), dtype=type(secondaries[0][0]))
     main_elem = 0
     while sum(rem_sizes) != 0:
         rand_var = np.random.random()
@@ -119,7 +119,7 @@ def split_data(data, labels, train_ratio = 0.8):
 def count_labels(labels):
     to_return = {0:0, 1:0, 2:0}
     for i in labels:
-        to_return[int(i[0])] += 1
+        to_return[int(i)] += 1
     return to_return
 
 def generate_outline_hist(bins, height):

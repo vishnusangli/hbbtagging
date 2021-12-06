@@ -21,7 +21,7 @@ M_SIG = ["PROC_hbbwlnu"]
 I_SIG = ["PROC_ja"]
 FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
 
-CURRFILE = I_SIG[0]
+CURRFILE = BGROUND[0]
 fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
@@ -70,10 +70,14 @@ image0 = np.zeros(( (img_sizes[0]) + 1,etabin,phibin), dtype=float)
 image1 = np.zeros(( (img_sizes[1]) + 1,etabin,phibin), dtype=float)
 image2 = np.zeros(( (img_sizes[2]) + 1,etabin,phibin), dtype=float)
 elem_num = [0, 0, 0]
+
+misc_vals_0  = np.zeros(( (img_sizes[0]) + 1,8), dtype=float)
+misc_vals_1  = np.zeros(( (img_sizes[1]) + 1,8), dtype=float)
+misc_vals_2  = np.zeros(( (img_sizes[2]) + 1,8), dtype=float)
 #%%
 # Loop over all event
 temp = time.localtime()
-print(f"Start time: {temp.tm_hour}:{temp.tm_min}:{temp.tm_mon}")
+print(f"Start time: {temp.tm_hour}:{temp.tm_min}:{temp.tm_sec}")
 n=0
 leading_jets = True
 for e in t:
@@ -92,12 +96,15 @@ for e in t:
         
         label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
         img_use = image2[elem_num[2]]
+        auxiliary_vals = misc_vals_2[elem_num[2]]
         if label == 0: 
             img_use = image0[elem_num[0]]
             elem_num[0] += 1
+            auxiliary_vals = misc_vals_0[elem_num[0]]
         elif label == 1:
             img_use = image1[elem_num[1]]
             elem_num[1] += 1
+            auxiliary_vals = misc_vals_1[elem_num[1]]
         else:
             elem_num[2] += 1 
 
@@ -115,7 +122,13 @@ for e in t:
             # Add to image
             img_use[myeta, myphi] += c.PT
         n+=1
-            
+        iter = 0
+        for i in fj.Tau:
+            auxiliary_vals[iter] = i
+            iter+= 1
+        auxiliary_vals[5] = fj.PT
+        auxiliary_vals[6] = fj.EhadOverEem
+        auxiliary_vals[7] = label
 
         if n % 1000 == 0:
             print(f"{n} Done: {elem_num}")
@@ -141,11 +154,23 @@ fig.subplots_adjust(right=0.8)
 fig.colorbar(im, ax = [ax1, ax2, ax3, ax4])
 plt.savefig(f"{DATA_DIR}/{CURRFILE}/labels.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
-# %% saving arrays into directory
+# %% 
+# saving arrays into directory
 np.save(f"{DATA_DIR}/{CURRFILE}/label_0", image0)
 np.save(f"{DATA_DIR}/{CURRFILE}/label_1", image1)
 np.save(f"{DATA_DIR}/{CURRFILE}/label_2", image2)
 
+misc_vals_0 = pd.DataFrame(misc_vals_0, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
+misc_vals_0.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(misc_vals_0))])
+misc_vals_0.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features_0.parquet", engine="pyarrow")
+
+misc_vals_1 = pd.DataFrame(misc_vals_1, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
+misc_vals_1.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(misc_vals_1))])
+misc_vals_1.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features_1.parquet", engine="pyarrow")
+
+misc_vals_2 = pd.DataFrame(misc_vals_2, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
+misc_vals_2.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(misc_vals_2))])
+misc_vals_2.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features_2.parquet", engine="pyarrow")
 # %%
 i = 0
 labels = []
@@ -174,7 +199,6 @@ for e in t:
     jet_num = 0
     for fj in e.GenFatJet:
         label = filter_blind(p_obj, label_0, label_1, fj.Phi, fj.Eta)
-        temp = []
         iter = 0
         for i in fj.Tau:
             auxiliary_vals[elem_num, iter] = i

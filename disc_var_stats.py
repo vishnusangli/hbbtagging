@@ -28,15 +28,23 @@ for ev_type in [BGROUND_Label, M_SIG_Label, I_SIG_Label]:
         ev_dir = I_SIG
     for event in ev_type.keys():
         for label in ev_type[event]:
+            print(ev_dir[event], label)
             curr_arr = np.load(f"{DATA_DIR}/{ev_dir[event]}/label_{label}.npy")
-            
-            curr_label = np.array(pd.read_parquet(f"{DATA_DIR}/{ev_dir[event]}/misc_features.parquet", engine="pyarrow"))
+            plt.imshow(curr_arr[-1])
+            plt.show()
+            curr_label = np.array(pd.read_parquet(f"{DATA_DIR}/{ev_dir[event]}/misc_features_{label}.parquet", engine="pyarrow"))
+            print(curr_label[-1])
+            print(len(curr_arr), len(curr_label))
             dataset_arr.append(curr_arr)
             label_arr.append(curr_label)
 
 
 success, parent_data, misc_vals = shuffle_arrays(dataset_arr, label_arr)
 master_label = misc_vals[:, -1]
+df_misc = pd.DataFrame(misc_vals, columns = ("code", "tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
+#df_misc[(df_misc.tau1 == 0) & (df_misc.EhadOverEem == 0)]
+#np.where((df_misc.tau1 == 0) & (df_misc.EhadOverEem == 0))
+#df_misc.loc[df_misc.EhadOverEem == 0]ma
 # %% 
 # Feature engineering
 master_data = log10(parent_data)
@@ -94,3 +102,4 @@ disc_vals = np.array([disc_var(model_predictions[i], 0.9) for i in range(0, mode
 # %%
 n, hist_0, hist_1, hist_2 =  generate_labelhist(disc_vals, test_label)
 plt_hist(n, hist_0, hist_1, hist_2)
+# %%
