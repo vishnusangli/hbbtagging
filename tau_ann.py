@@ -15,26 +15,7 @@ M_SIG_Label = {0:[0]}
 I_SIG_Label = {0:[2]}
 MODELTYPE = 'tau-ann'
 # Retrieve Datasets
-dataset_arr = []
-code_arr = []
-for ev_type in [BGROUND_Label, M_SIG_Label, I_SIG_Label]:
-    if ev_type == BGROUND_Label:
-        ev_dir = BGROUND
-    elif ev_type == M_SIG_Label:
-        ev_dir = M_SIG
-    else:
-        ev_dir = I_SIG
-    for event in ev_type.keys():
-        for label in ev_type[event]:
-            print(ev_dir[event], label)
-            curr_arr = pd.read_parquet(f"{DATA_DIR}/{ev_dir[event]}/misc_features_{label}.parquet", engine="pyarrow")
-            curr_code = np.array(curr_arr.pop('code'))
-            dataset_arr.append(np.array(curr_arr))
-            code_arr.append(curr_code)
-
-
-success, parent_data, code_label = shuffle_arrays(dataset_arr, code_arr, shape = [dataset_arr[0].shape[1]])
-master_label, master_data = parent_data[:, -1], parent_data[:, :-1]
+misc_vals, parent_data, master_label, jet_codes = get_files(BGROUND_Label, M_SIG_Label, I_SIG_Label, misc_features=7, seed = 0)
 count_labels(master_label)
 # %% Basic model
 model = tf.keras.Sequential([
@@ -48,7 +29,7 @@ model.compile(optimizer='adam',
               metrics=['accuracy', "sparse_categorical_accuracy"])
 # %% 
 # Train/test split data
-train_data, train_label, test_data, test_label = split_data(master_data, master_label, train_ratio=0.8)
+train_data, train_label, test_data, test_label = split_data(parent_data, master_label, train_ratio=0.8)
 count_labels(train_label), count_labels(test_label)
 # %%
 # %%

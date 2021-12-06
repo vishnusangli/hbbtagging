@@ -15,53 +15,11 @@ M_SIG_Label = {0:[0]}
 I_SIG_Label = {0:[2]}
 MODELTYPE = 'cnn'
 # Retrieve Datasets
-dataset_arr = []
-label_arr = []
-for ev_type in [BGROUND_Label, M_SIG_Label, I_SIG_Label]:
-    if ev_type == BGROUND_Label:
-        ev_dir = BGROUND
-    elif ev_type == M_SIG_Label:
-        ev_dir = M_SIG
-    else:
-        ev_dir = I_SIG
-    for event in ev_type.keys():
-        for label in ev_type[event]:
-            curr_arr = np.load(f"{DATA_DIR}/{ev_dir[event]}/label_{label}.npy")
-            curr_label = np.full((curr_arr.shape[0], 1), label)
-
-            dataset_arr.append(curr_arr)
-            label_arr.append(curr_label)
-
-
-success, parent_data, master_label = shuffle_arrays(dataset_arr, label_arr)
-# %% 
+misc_vals, parent_data, master_label, jet_codes = get_files(BGROUND_Label, M_SIG_Label, I_SIG_Label, misc_features=7, seed = 0)
+count_labels(master_label)
+# %%
 # Feature engineering
-master_data = log10(parent_data)
-global_max = np.nanmax(master_data)
-global_min = np.nanmin(master_data)
-altered_min = global_min - 1 #normalized 0 reserved for NaN
-
-def try_1(sep):
-    """
-    Current feature extraction version
-    """
-    inter = np.multiply(sep, -1)
-    inter = shift(inter,1 - np.nanmin(inter))
-    inter = np.log2(inter)
-    inter = 1 - custom_norm(inter, -1.5, np.nanmax(inter)+ 1.5, 1.)
-    return inter
-
-def try_2(master_data):
-    master_data = shift(master_data, 2 - global_min)
-    master_data = nanlog(master_data, np.log(2)) 
-    new_global_max = np.nanmax(master_data)
-    master_data = custom_norm(master_data, 0, new_global_max)
-    return master_data
-
-def try_3(sep):
-    pass
-
-master_data = try_1(master_data)
+master_data = jet_img_FeatureEngineering.current(parent_data)
 # %% 
 # Print images
 plot_data(master_data, master_label, shape = (5, 4), start = 0)
@@ -81,7 +39,6 @@ model.compile(optimizer='adam',
               metrics=['accuracy', "sparse_categorical_accuracy"])
 # %% 
 # Train/test split data
-
 train_data, train_label, test_data, test_label = split_data(master_data, master_label, train_ratio=0.8)
 # %%
 # fit model
@@ -89,22 +46,7 @@ NUM_EPOCHS = 20
 BATCH_SIZE = 10
 model.fit(x = train_data, y = train_label, validation_data = (test_data, test_label), batch_size = BATCH_SIZE, epochs=NUM_EPOCHS)
 # %%
-plt.figure()
-x_vals = np.arange(1, NUM_EPOCHS + 1)
-plt.plot( x_vals, model.history.history['accuracy'], label = 'accuracy')
-plt.plot( x_vals, model.history.history['val_accuracy'], label = 'val_accuracy')
-plt.legend()
-plt.xlabel("Epoch")
-plt.ylabel('Accuracy')
-plt.title("Accuracy over epochs")
-plt.show()
-plt.plot( x_vals, model.history.history['loss'], label = "loss")
-plt.plot( x_vals, model.history.history['val_loss'], label = 'val_loss')
-plt.legend()
-plt.xlabel("Epoch")
-plt.ylabel('Loss')
-plt.title("Loss over epochs")
-plt.show()
+plot_accuracy_loss(model, NUM_EPOCHS)
 # %%
 #Test Accuracy
 test_loss, test_accuracy = model.evaluate(train_data, train_label)

@@ -58,8 +58,38 @@ def plot_performance(data, labels, predictions, shape = (5, 4), start = 0):
         plt.imshow(data[elem + start])
         str_val = f"{predictions[elem + start]}({labels[elem + start]})"
         plt.xlabel(str_val, color = 'green' if np.argmax(predictions[elem + start]) == labels[elem + start] else 'red')
-        
-def shuffle_arrays(inputs, secondaries, shape = (SIDE_SIZE, SIDE_SIZE),  seed = 0):
+
+def get_files(BGROUND_Label, M_SIG_Label, I_SIG_Label, misc_features = 7, seed = 0):
+    dataset_arr = []
+    label_arr = []
+    code_arr = []
+    for ev_type in [BGROUND_Label, M_SIG_Label, I_SIG_Label]:
+        if ev_type == BGROUND_Label:
+            ev_dir = BGROUND
+        elif ev_type == M_SIG_Label:
+            ev_dir = M_SIG
+        else:
+            ev_dir = I_SIG
+        for event in ev_type.keys():
+            for label in ev_type[event]:
+                curr_arr = np.load(f"{DATA_DIR}/{ev_dir[event]}/label_{label}.npy")
+                if len(curr_arr) > 0:
+                    curr_label = curr_arr[:, 1]
+                    dataset_arr.append(curr_arr[:, 2:])
+                    label_arr.append(curr_label)
+                    code_arr.append(curr_arr[:, 0])
+    print(f"Found {len(dataset_arr)} arrays")
+    success, parent_data, master_label, codes = ter_shuffle_arrays(dataset_arr, label_arr, code_arr, shape = [dataset_arr[0].shape[1]], seed = seed)
+    assert success == 0, "file read fail"
+    misc_vals, parent_data = parent_data[:, :misc_features], parent_data[:, misc_features:]
+    temp = int(np.sqrt(parent_data.shape[1]))
+    assert temp**2 == parent_data.shape[1], "Invalid image axes for reshaping"
+    parent_data = parent_data.reshape((len(parent_data), temp, temp))
+    master_label = master_label.reshape([len(master_label), ])
+    codes = codes.reshape([len(master_label), ])
+    return misc_vals, parent_data, master_label, codes
+
+def naive_shuffle_arrays(inputs, secondaries, shape = (SIDE_SIZE, SIDE_SIZE), sec_shape = [1],  seed = 0):
     """
     Shuffles a list of arrays in a single iteration (O(n) time).
 
@@ -87,7 +117,7 @@ def shuffle_arrays(inputs, secondaries, shape = (SIDE_SIZE, SIDE_SIZE),  seed = 
     calc_threshold()
     temp = sum(rem_sizes)
     main_output = np.zeros((temp, *shape))
-    main_secondary = np.empty(shape = (temp, secondaries[0][0].shape[0]), dtype=type(secondaries[0][0]))
+    main_secondary = np.empty(shape = (temp, *sec_shape), dtype=type(secondaries[0][0]))
     main_elem = 0
     while sum(rem_sizes) != 0:
         rand_var = np.random.random()
@@ -105,6 +135,56 @@ def shuffle_arrays(inputs, secondaries, shape = (SIDE_SIZE, SIDE_SIZE),  seed = 
         print(f"Disparity in index: interated main index: {main_elem}, original calculated size: {main_output.shape[0]}")
         return 1, main_output
     return 0, main_output, main_secondary
+
+def ter_shuffle_arrays(inputs, secondaries, tertiaries, shape = (SIDE_SIZE, SIDE_SIZE), sec_shape = [1], ter_shape = [1],  seed = 0):
+    """
+    Shuffles a 3 diff arrays 
+    Altered for the form image, label, code. Needed since code is a string
+
+    Generates a random variable that chooses next array to be popped 
+    from, corresponding to a weighted set of thresholds.
+    """
+    np.random.seed(seed)
+    start_elems = [0 for i in inputs]
+    rem_sizes = [0 for i in inputs]
+
+    def update_rem():
+        nonlocal rem_sizes
+        rem_sizes = [inputs[i].shape[0] - start_elems[i] for i in range(0, len(inputs))]
+
+    thresholds = [1 for i in inputs]
+    def calc_threshold():
+        update_rem()
+        total = sum(rem_sizes)
+        floor = 0
+        for i in range(0, len(thresholds)):
+            temp = np.divide(rem_sizes[i], total) if rem_sizes[i] != 0 else 0
+            floor += temp
+            thresholds[i] = floor
+
+    calc_threshold()
+    temp = sum(rem_sizes)
+    main_output = np.zeros((temp, *shape))
+    main_secondary = np.empty(shape = (temp, *sec_shape))
+    main_tertiary = np.empty(shape = (temp, *ter_shape), dtype = tertiaries[0].dtype)
+    main_elem = 0
+    while sum(rem_sizes) != 0:
+        rand_var = np.random.random()
+        choose_array = None
+        for i in range(0, len(thresholds)):
+            if thresholds[i] > rand_var and rem_sizes[i]:
+                choose_array = i
+                break
+        main_output[main_elem] = inputs[choose_array][start_elems[choose_array]]
+        main_secondary[main_elem] = secondaries[choose_array][start_elems[choose_array]]
+        main_tertiary[main_elem] = tertiaries[choose_array][start_elems[choose_array]]
+        start_elems[i] += 1
+        main_elem += 1
+        calc_threshold()
+    if main_elem != main_output.shape[0]:
+        print(f"Disparity in index: interated main index: {main_elem}, original calculated size: {main_output.shape[0]}")
+        return 1, main_output
+    return 0, main_output, main_secondary, main_tertiary
 
 def split_data(data, labels, train_ratio = 0.8):
     """
@@ -211,3 +291,29 @@ def plt_hist(n, hist_0, hist_1, hist_2):
     plt.tight_layout()
     plt.legend()
     plt.show()
+
+class jet_img_FeatureEngineering:
+    def try_1(sep):
+        """
+        Current feature extraction version
+        """
+        inter = log10(sep)
+        inter = np.multiply(inter, -1)
+        inter = shift(inter,1 - np.nanmin(inter)) #normalized 0 reserved for NaN, here is inversed for more space at bottom
+        inter = np.log2(inter)
+        inter = 1 - custom_norm(inter, -1.5, np.nanmax(inter)+ 1.5, 1.)
+        return inter
+
+    def try_2(master_data):
+        master_data = log10(master_data)
+        global_min = np.nanmin(master_data)
+        master_data = shift(master_data, 2 - global_min)
+        master_data = nanlog(master_data, np.log(2)) 
+        new_global_max = np.nanmax(master_data)
+        master_data = custom_norm(master_data, 0, new_global_max)
+        return master_data
+
+    def try_3(sep):
+        pass
+
+    current = try_1

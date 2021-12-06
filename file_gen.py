@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import sys
 import time
 import pandas as pd
-from tensorflow.python.ops.ragged.ragged_array_ops import size
 from file_support import *
 # %% Add Delphes library
 ROOT.gSystem.Load(f'libDelphes')
@@ -21,7 +20,7 @@ M_SIG = ["PROC_hbbwlnu"]
 I_SIG = ["PROC_ja"]
 FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
 
-CURRFILE = BGROUND[0]
+CURRFILE = I_SIG[0]
 fh = ROOT.TFile.Open(f'{SAMPLEDIR}/{CURRFILE}{FILE_EXT}')
 t = fh.Get('Delphes')
 
@@ -99,12 +98,12 @@ for e in t:
         auxiliary_vals = misc_vals_2[elem_num[2]]
         if label == 0: 
             img_use = image0[elem_num[0]]
-            elem_num[0] += 1
             auxiliary_vals = misc_vals_0[elem_num[0]]
+            elem_num[0] += 1
         elif label == 1:
             img_use = image1[elem_num[1]]
-            elem_num[1] += 1
             auxiliary_vals = misc_vals_1[elem_num[1]]
+            elem_num[1] += 1
         else:
             elem_num[2] += 1 
 
@@ -121,15 +120,16 @@ for e in t:
 
             # Add to image
             img_use[myeta, myphi] += c.PT
-        n+=1
-        iter = 0
+
+        auxiliary_vals[0] = label
+        iter = 1
         for i in fj.Tau:
             auxiliary_vals[iter] = i
             iter+= 1
-        auxiliary_vals[5] = fj.PT
-        auxiliary_vals[6] = fj.EhadOverEem
-        auxiliary_vals[7] = label
+        auxiliary_vals[6] = fj.PT
+        auxiliary_vals[7] = fj.EhadOverEem
 
+        n+=1
         if n % 1000 == 0:
             print(f"{n} Done: {elem_num}")
 
@@ -142,6 +142,7 @@ print(f"Label 0 shape: {image0.shape}")
 print(f"Label 1 shape: {image1.shape}")
 print(f"Label 2 shape: {image2.shape}")
 # %%
+#Plotting sample jet images
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, sharex = True, sharey = True)
 im = ax1.imshow(log10(image0[0]),extent=(etamin,etamax,phimin,phimax))
 ax1.set_title("0: Hbb")
@@ -155,22 +156,20 @@ fig.colorbar(im, ax = [ax1, ax2, ax3, ax4])
 plt.savefig(f"{DATA_DIR}/{CURRFILE}/labels.png", facecolor = 'white', edgecolor = 'white')
 plt.show()
 # %% 
+#Concatenating jet image and feature vars in 1 array 
+index_0 = [f"{CURRFILE}_labl0-{i}" for i in range(0, len(misc_vals_0))]
+index_0 = np.reshape(index_0, (len(misc_vals_0), 1))
+temp_0 = np.concatenate((index_0, misc_vals_0, image0.reshape((len(image0), image0.shape[1] * image0.shape[2]))), axis = 1)
+index_1 = np.reshape([f"{CURRFILE}_labl1-{i}" for i in range(0, len(misc_vals_1))], (len(misc_vals_1), 1))
+temp_1 = np.concatenate((index_1, misc_vals_1, image1.reshape((len(image1), image1.shape[1] * image1.shape[2]))), axis = 1)
+index_2 = np.reshape([f"{CURRFILE}_labl2-{i}" for i in range(0, len(misc_vals_2))], (len(misc_vals_2), 1))
+temp_2 = np.concatenate((index_2, misc_vals_2, image2.reshape((len(image2), image2.shape[1] * image2.shape[2]))), axis = 1)
+# %%
 # saving arrays into directory
-np.save(f"{DATA_DIR}/{CURRFILE}/label_0", image0)
-np.save(f"{DATA_DIR}/{CURRFILE}/label_1", image1)
-np.save(f"{DATA_DIR}/{CURRFILE}/label_2", image2)
-
-misc_vals_0 = pd.DataFrame(misc_vals_0, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
-misc_vals_0.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(misc_vals_0))])
-misc_vals_0.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features_0.parquet", engine="pyarrow")
-
-misc_vals_1 = pd.DataFrame(misc_vals_1, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
-misc_vals_1.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(misc_vals_1))])
-misc_vals_1.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features_1.parquet", engine="pyarrow")
-
-misc_vals_2 = pd.DataFrame(misc_vals_2, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
-misc_vals_2.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(misc_vals_2))])
-misc_vals_2.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features_2.parquet", engine="pyarrow")
+np.save(f"{DATA_DIR}/{CURRFILE}/label_0", temp_0[:-1])
+np.save(f"{DATA_DIR}/{CURRFILE}/label_1", temp_1[:-1])
+np.save(f"{DATA_DIR}/{CURRFILE}/label_2", temp_2[:-1])
+#temp = pd.DataFrame(misc_vals_0, columns = ("label", "tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem")) 
 # %%
 i = 0
 labels = []
@@ -210,11 +209,7 @@ for e in t:
         jet_num += 1
         if leading_jets and jet_num == 2:
             break
-
-# %%
-#Save misc_features array
 temp = pd.DataFrame(auxiliary_vals, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
 temp.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(temp))])
-# %%
 temp.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features.parquet", engine="pyarrow")
 # %%
