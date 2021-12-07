@@ -36,15 +36,15 @@ count_labels(train_label), count_labels(test_label)
 # fit model
 NUM_EPOCHS = 20
 BATCH_SIZE = 10
-lim = len(train_data)
+lim = 20 #len(train_data)
 first = train_data[:lim]
 model.fit(x = first, y = train_label[0:lim], validation_data = (test_data[0:lim], test_label[0:lim]), batch_size = BATCH_SIZE, epochs=NUM_EPOCHS)
 # %%
 plot_accuracy_loss(model, NUM_EPOCHS)
 # %%
 # Predict on test data
-num_do = test_label.shape[0]
-model_predictions = np.zeros(shape = (test_label.shape[0], 3))
+num_do = 10 #test_label.shape[0]
+model_predictions = np.zeros(shape = (num_do, 3))
 for i in range(0, num_do):
     model_predictions[i] = model.predict(np.reshape(test_data[i], (1, 7)) ) 
     if i % 500 == 0:
@@ -73,4 +73,18 @@ plt_hist(n, hist_0, hist_1, hist_2)
 # %%
 temp = time.localtime()
 tf.keras.models.save_model( model, f"../models/{MODELTYPE}/{temp.tm_mon}-{temp.tm_mday}", overwrite=True,)
+# %%
+# %%
+load_model_name = "12-3"
+model = tf.keras.models.load_model(f"../models/{MODELTYPE}/{load_model_name}")
+
+# %%
+# %%
+lims = [0, len(model_predictions)]
+first = pd.DataFrame(test_data[lims[0]:lims[1]], columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem"))
+first.insert(0, "label" ,test_label[lims[0]:lims[1]])
+sec = pd.DataFrame(model_predictions[lims[0]:lims[1]], columns = ["label 1", "label 2", "label 3"])
+sec.insert(3, "disc_val", disc_vals)
+first = first.join(sec, how = 'outer')
+
 # %%
