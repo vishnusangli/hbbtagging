@@ -196,6 +196,16 @@ def split_data(data, labels, train_ratio = 0.8):
     print(f"{train_data.shape[0]}:{test_data.shape[0]}")
     return train_data, train_label, test_data, test_labels
 
+def ter_split_data(data, labels, code, train_ratio = 0.8):
+    """
+    lower bound value
+    """
+    train_elems = int(np.multiply(data.shape[0], train_ratio))
+    train_data, train_label, train_code = data[0:train_elems], labels[0:train_elems], code[0:train_elems]
+    test_data, test_labels, test_code = data[train_elems:], labels[train_elems:], code[train_elems:]
+    print(f"{train_data.shape[0]}:{test_data.shape[0]}")
+    return train_data, train_label, train_code, test_data, test_labels, test_code
+
 def count_labels(labels):
     to_return = {0:0, 1:0, 2:0}
     for i in labels:
@@ -255,7 +265,21 @@ def plot_accuracy_loss(model, num_epochs):
     plt.ylabel('Loss')
     plt.title("Loss over epochs")
     plt.show()
+def sort_disc_vals(disc_vals, test_label):
+    label_0, label_1, label_2 = [], [], []
+    for i in range(0, len(disc_vals)):
+        if test_label[i] == 0:
+            label_0.append(disc_vals[i])
+        elif test_label[i] == 1:
+            label_1.append(disc_vals[i])
+        elif test_label[i] == 2:
+            label_2.append(disc_vals[i])
 
+    label_0 = np.array(label_0)
+    label_1 = np.array(label_1)
+    label_2 = np.array(label_2)
+    return label_0, label_1, label_2
+    
 def generate_labelhist(disc_vals, test_label):
     label_0, label_1, label_2 = [], [], []
     for i in range(0, len(disc_vals)):

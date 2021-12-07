@@ -29,7 +29,7 @@ model.compile(optimizer='adam',
               metrics=['accuracy', "sparse_categorical_accuracy"])
 # %% 
 # Train/test split data
-train_data, train_label, test_data, test_label = split_data(parent_data, master_label, train_ratio=0.8)
+train_data, train_label, train_code, test_data, test_label, test_code = ter_split_data(misc_vals, master_label, jet_codes, train_ratio=0.8)
 count_labels(train_label), count_labels(test_label)
 # %%
 # %%

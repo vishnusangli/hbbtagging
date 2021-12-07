@@ -39,7 +39,7 @@ model.compile(optimizer='adam',
               metrics=['accuracy', "sparse_categorical_accuracy"])
 # %% 
 # Train/test split data
-train_data, train_label, test_data, test_label = split_data(master_data, master_label, train_ratio=0.8)
+train_data, train_label, train_code, test_data, test_label, test_code = ter_split_data(master_data, master_label, jet_codes, train_ratio=0.8)
 # %%
 # fit model
 NUM_EPOCHS = 20
