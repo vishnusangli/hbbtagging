@@ -69,10 +69,10 @@ image0 = np.zeros(( (img_sizes[0]) + 1,etabin,phibin), dtype=float)
 image1 = np.zeros(( (img_sizes[1]) + 1,etabin,phibin), dtype=float)
 image2 = np.zeros(( (img_sizes[2]) + 1,etabin,phibin), dtype=float)
 elem_num = [0, 0, 0]
-
-misc_vals_0  = np.zeros(( (img_sizes[0]) + 1,8), dtype=float)
-misc_vals_1  = np.zeros(( (img_sizes[1]) + 1,8), dtype=float)
-misc_vals_2  = np.zeros(( (img_sizes[2]) + 1,8), dtype=float)
+misc_features = 9
+misc_vals_0  = np.zeros(( (img_sizes[0]) + 1,misc_features), dtype=float)
+misc_vals_1  = np.zeros(( (img_sizes[1]) + 1,misc_features), dtype=float)
+misc_vals_2  = np.zeros(( (img_sizes[2]) + 1,misc_features), dtype=float)
 #%%
 # Loop over all event
 temp = time.localtime()
@@ -128,6 +128,7 @@ for e in t:
             iter+= 1
         auxiliary_vals[6] = fj.PT
         auxiliary_vals[7] = fj.EhadOverEem
+        auxiliary_vals[8] = fj.Mass
 
         n+=1
         if n % 1000 == 0:

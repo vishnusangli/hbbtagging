@@ -8,7 +8,7 @@ M_SIG = ["PROC_hbbwlnu"]
 I_SIG = ["PROC_ja"]
 FILE_EXT = "/Events/run_01/tag_1_delphes_events.root"
 SIDE_SIZE = 30
-FEATURE_VARS = ["tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem"]
+FEATURE_VARS = ["tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "Mass"]
 def log10(val):
     if val <= 0:
         return np.NaN
