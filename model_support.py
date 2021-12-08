@@ -280,20 +280,7 @@ def sort_disc_vals(disc_vals, test_label):
     label_2 = np.array(label_2)
     return label_0, label_1, label_2
     
-def generate_labelhist(disc_vals, test_label):
-    label_0, label_1, label_2 = [], [], []
-    for i in range(0, len(disc_vals)):
-        if test_label[i] == 0:
-            label_0.append(disc_vals[i])
-        elif test_label[i] == 1:
-            label_1.append(disc_vals[i])
-        elif test_label[i] == 2:
-            label_2.append(disc_vals[i])
-
-    label_0 = np.array(label_0)
-    label_1 = np.array(label_1)
-    label_2 = np.array(label_2)
-
+def generate_labelhist(label_0, label_1, label_2, disc_vals):
     num_bins = 40
     disc_range = (min(disc_vals), max(disc_vals))
     hist_0, n = np.histogram(label_0, bins = num_bins, range = disc_range)
@@ -301,8 +288,8 @@ def generate_labelhist(disc_vals, test_label):
     hist_2, n = np.histogram(label_2, bins = num_bins, range = disc_range)
     return n, hist_0, hist_1, hist_2
 
-def plt_hist(n, hist_0, hist_1, hist_2):
-    plt.figure(figsize = (6, 6))
+def plt_hist(n, hist_0, hist_1, hist_2, title = ""):
+    #plt.figure(figsize = (6, 6))
     x, y_0 = generate_outline_hist(n, hist_0)
     x, y_1 = generate_outline_hist(n, hist_1)
     x, y_2 = generate_outline_hist(n, hist_2)
@@ -310,11 +297,31 @@ def plt_hist(n, hist_0, hist_1, hist_2):
     plt.semilogy(x, y_1/y_1.sum(), color = "green", linestyle = "dashed", label = "Label 1")
     plt.semilogy(x, y_2/y_2.sum(), color = "red", linestyle = "dashdot", label = "Label 2")
     #plt.xticks(n)
+    plt.title(title)
     plt.xlabel("D")
     plt.ylabel("Label fraction")
     plt.tight_layout()
     plt.legend()
-    plt.show()
+
+def plot_rej_rates(label_0, label_1, label_2, modeltype):
+    label_0.sort()
+    rej = True
+
+    x_frac, y_1, y_2 = eff_rej_calc(label_0, label_1, label_2, rej = rej)
+    plt.figure(figsize = (7, 7))
+    plt.plot(x_frac, y_1, color = "green", linestyle = "dashed", label = "Label 1")
+    plt.plot(x_frac, y_2, color = "red", linestyle = "dashdot", label = "Label 2" )
+    if rej:
+        plt.ylabel("jet rejection")
+        plt.title("Jet rejection versus hbb efficiency")
+    else:
+        plt.ylabel("jet efficiency")
+        plt.title("Jet efficiency versus hbb efficiency")
+    plt.xlabel(f"Hbb jet efficiency for {modeltype}")
+    plt.ylim(0, 1)
+    plt.legend()
+    plt.grid()
+    plt.tight_layout()
 
 class jet_img_FeatureEngineering:
     def try_1(sep):

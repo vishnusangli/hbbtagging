@@ -82,78 +82,13 @@ disc_vals = np.array([disc_var(model_predictions[i], 0.9) for i in range(0, mode
 # precision, recall, F1 on label 0?
 
 #test_accuracy = (predicted_labels == test_label).sum()/predicted_labels.shape[0]
-"""
-test_acc = 0
-for i in range(0, len(predicted_labels)):
-    if predicted_labels[i] == test_label[i]:
-        test_acc += 1
-test_acc /= len(predicted_labels)
-"""
-
-
 # %%
-label_0, label_1, label_2 = [], [], []
-for i in range(0, len(disc_vals)):
-    if test_label[i] == 0:
-        label_0.append(disc_vals[i])
-    elif test_label[i] == 1:
-        label_1.append(disc_vals[i])
-    elif test_label[i] == 2:
-        label_2.append(disc_vals[i])
-
-label_0 = np.array(label_0)
-label_1 = np.array(label_1)
-label_2 = np.array(label_2)
-
-num_bins = 40
-disc_range = (min(disc_vals), max(disc_vals))
-hist_0, n = np.histogram(label_0, bins = num_bins, range = disc_range)
-hist_1, n = np.histogram(label_1, bins = num_bins, range = disc_range)
-hist_2, n = np.histogram(label_2, bins = num_bins, range = disc_range)
-
-#%%
-def plt_log10(x):
-    if x <= 0:
-        return 0
-    return np.log10(x)
-plt_log10 = np.vectorize
-
-plt.figure(figsize = (6, 6))
-x, y_0 = generate_outline_hist(n, hist_0)
-x, y_1 = generate_outline_hist(n, hist_1)
-x, y_2 = generate_outline_hist(n, hist_2)
-plt.semilogy(x, y_0/y_0.sum(), color = "blue", linestyle = "solid", label = "Label 0")
-plt.semilogy(x, y_1/y_1.sum(), color = "green", linestyle = "dashed", label = "Label 1")
-plt.semilogy(x, y_2/y_2.sum(), color = "red", linestyle = "dashdot", label = "Label 2")
-#plt.xticks(n)
-plt.xlabel("D")
-plt.ylabel("Label fraction")
-plt.tight_layout()
-plt.legend()
-
+label_0, label_1, label_2 = sort_disc_vals(disc_vals, test_label)
+n, hist_0, hist_1, hist_2 =  generate_labelhist(label_0, label_1, label_2, disc_vals)
+plt_hist(n, hist_0, hist_1, hist_2, f"Discriminating variable for {MODELTYPE}")
 # %%
 #Obtain Rejection rates
-label_0.sort()
-rej = True
-
-x_frac, y_1, y_2 = eff_rej_calc(label_0, label_1, label_2, rej = rej)
-plt.figure(figsize = (7, 7))
-plt.plot(x_frac, y_1, color = "green", linestyle = "dashed", label = "Label 1")
-plt.plot(x_frac, y_2, color = "red", linestyle = "dashdot", label = "Label 2" )
-if rej:
-    plt.ylabel("jet rejection")
-    plt.title("Jet rejection versus hbb efficiency")
-else:
-    plt.ylabel("jet efficiency")
-    plt.title("Jet efficiency versus hbb efficiency")
-plt.xlabel("Hbb jet efficiency")
-plt.ylim(0, 1)
-plt.legend()
-plt.grid()
-plt.tight_layout()
-plt.show()
-#%%
-# Get hist distributions of 
+plot_rej_rates(label_0, label_1, label_2, MODELTYPE) 
 # %%
 #Calculate predicted label based on discriminant
 predicted_labels = []
@@ -177,6 +112,8 @@ print(confusion_mat)
 temp = time.localtime()
 tf.keras.models.save_model( model, f"../models/cnn/{temp.tm_mon}-{temp.tm_mday}", overwrite=True,)
 
+# %%
+############## End of Regular File ################
 # %%
 load_model_name = "11-13"
 model = tf.keras.models.load_model(f"../models/cnn/{load_model_name}")
