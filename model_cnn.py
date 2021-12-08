@@ -114,6 +114,7 @@ tf.keras.models.save_model( model, f"../models/cnn/{temp.tm_mon}-{temp.tm_mday}"
 
 # %%
 ############## End of Regular File ################
+"""
 # %%
 load_model_name = "11-13"
 model = tf.keras.models.load_model(f"../models/cnn/{load_model_name}")
@@ -122,3 +123,4 @@ np.save("model_preds_11-23.npy", model_predictions)
 # %%
 model_predictions = np.load("model_preds_11-23.npy")
 # %%
+"""

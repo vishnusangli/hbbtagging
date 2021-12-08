@@ -111,7 +111,9 @@ tf.keras.models.save_model( model, f"../models/{MODELTYPE}/{temp.tm_mon}-{temp.t
 # %%
 ############## End of Regular File ################
 # %%
+"""
 #Load Previous Saved model
 load_model_name = "12-3"
 model = tf.keras.models.load_model(f"../models/{MODELTYPE}/{load_model_name}")
 # %%
+"""

@@ -171,6 +171,7 @@ np.save(f"{DATA_DIR}/{CURRFILE}/label_1", temp_1[:-1])
 np.save(f"{DATA_DIR}/{CURRFILE}/label_2", temp_2[:-1])
 #temp = pd.DataFrame(misc_vals_0, columns = ("label", "tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem")) 
 # %%
+"""
 i = 0
 labels = []
 stop = False
@@ -186,8 +187,10 @@ for e in t:
     if stop:
         break
     i += 1
+"""
 # %%
 # Jet Tau, PT and EhadOverEem variable loop
+"""
 auxiliary_vals = np.zeros((n + 1, 8))
 elem_num = 0
 leading_jets = True
@@ -212,4 +215,5 @@ for e in t:
 temp = pd.DataFrame(auxiliary_vals, columns = ("tau1", "tau2", "tau3", "tau4", "tau5", "PT", "EhadOverEem", "label"))
 temp.insert(0, "code", [f"{CURRFILE}-{i}" for i in range(0, len(temp))])
 temp.to_parquet(f"{DATA_DIR}/{CURRFILE}/misc_features.parquet", engine="pyarrow")
+"""
 # %%
