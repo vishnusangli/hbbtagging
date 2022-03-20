@@ -1,6 +1,8 @@
+"""
+Provide a pure mass-based classification, based on a set threshold
+"""
 # %%
 import h5py
-import sys
 
 import tensorflow as tf
 import sonnet as snt
@@ -9,15 +11,9 @@ import numpy as np
 
 import pandas as pd
 
-import hbbgbb.plot as myplt
 from hbbgbb import data
-from hbbgbb import analysis
-
-from hbbgbb.models import SimpleModel
-import settings
-import glob
+from hbbgbb import eng
 from tqdm import tqdm
-
 # %%
 df = data.load_data()
 data.label(df)

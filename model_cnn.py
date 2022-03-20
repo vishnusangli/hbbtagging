@@ -4,7 +4,6 @@
 
 #%%
 import sys
-from unicodedata import name
 import tensorflow as tf
 import sonnet as snt
 import matplotlib.pyplot as plt
@@ -15,9 +14,11 @@ import pandas as pd
 import hbbgbb.plot as myplt
 from hbbgbb import data
 from hbbgbb import analysis
+from hbbgbb import eng
 
 from hbbgbb.models import SimpleCNN
-import explore_files
+import compare_imgs
+
 from tqdm import tqdm
 STATSDIR = 'data_stats'
 MODELSTATS = 'model_stats'
@@ -40,17 +41,17 @@ from hbbgbb import formatter
 fmt=formatter.Formatter('variables.yaml')
 
 # %%
-train_data, train_label = explore_files.load_calo_data()
-test_data, test_label = explore_files.load_calo_data('r9364')
+train_data, train_label = eng.load_calo_data()
+test_data, test_label = eng.load_calo_data('r9364')
 
 # %%
 # Feature Engineering
 
-train_data = explore_files.Feature_Eng.current(train_data)
-explore_files.avg_img_perlabel(train_data, train_label, name = "avg_img_train")
+train_data = eng.Feature_Eng.current(train_data)
+compare_imgs.avg_img_perlabel(train_data, train_label, name = "avg_img_train")
 
-test_data = explore_files.Feature_Eng.current(test_data)
-explore_files.avg_img_perlabel(test_data, test_label, name = "avg_img_test")
+test_data = eng.Feature_Eng.current(test_data)
+compare_imgs.avg_img_perlabel(test_data, test_label, name = "avg_img_test")
 
 # %%
 class CNN_BatchTrainer:
@@ -59,28 +60,21 @@ class CNN_BatchTrainer:
 
         self.loss = []
         self.stat = pd.DataFrame(columns=['train_loss','test_loss'])
-        self.opt = snt.optimizers.SGD(learning_rate=0.1)
+        self.opt = snt.optimizers.SGD(learning_rate=0.001)
         self.loss_fn = tf.losses.CategoricalCrossentropy(from_logits=True)
     def Batch_Trainer(self, data, label, start, end):
         batch_data, batch_label = data[start: end], label[start: end]
         pred = self.model(batch_data, is_training = True)
         with tf.GradientTape() as tape:
-            
             loss = self.loss_fn(batch_label, pred)
+
+            params = self.model.trainable_variables
+            grads = tape.gradient(loss, params)
+
         return loss
 
-    
-    def master_train(self, data, label, epochs, batch_size = 16):
-
-        for epoch in range(epochs):
-            for batch in tqdm(range((data.shape[0]//batch_size) + 1)):
-                start, end = (batch * batch_size), min(batch_size * (batch + 1), data.shape[0])
-                batch_loss = self.Batch_Trainer(data, label, start, end)
-
-
-
 # %%
-shape = (explore_files.IMG_SIZE, explore_files.IMG_SIZE)
+shape = (eng.IMG_SIZE, eng.IMG_SIZE)
 
 train_data, train_label = tf.convert_to_tensor(train_data, dtype = tf.float32), tf.convert_to_tensor(train_label, dtype = tf.float32)
 test_data, test_label = tf.convert_to_tensor(test_data, dtype = tf.float32), tf.convert_to_tensor(test_label, dtype = tf.float32)
