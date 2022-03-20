@@ -1,0 +1,51 @@
+mass:
+  hist:
+    bins: 100
+    range: [0,200]
+  fig:
+    label: 'mass'
+    units: 'GeV'
+C2:
+  hist:
+    bins: 100
+    range: [0,1]
+  fig:
+    label: '$C_{2}$'
+Tau21_wta:
+  hist:
+    bins: 100
+    range: [0,1]
+  fig:
+    label: '$\tau_{21}$'
+nConstituents:
+  hist:
+    bins: 100
+    range: [-0.5,99.5]
+  fig:
+    label: 'Number of Constituents'
+
+score0:
+  hist:
+    bins: 100
+    range: [0,1]
+  fig:
+    label: 'Score 0'
+score1:
+  hist:
+    bins: 100
+    range: [0,1]
+  fig:
+    label: 'Score 1'
+score2:
+  hist:
+    bins: 100
+    range: [0,1]
+  fig:
+    label: 'Score 2'
+
+xbbscore:
+  hist:
+    bins: 100
+    range: [-10,10]
+  fig:
+    label: 'Xbb Score'
