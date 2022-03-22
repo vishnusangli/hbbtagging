@@ -23,7 +23,7 @@ import settings
 STATSDIR = 'data_stats'
 MODELSTATS = 'model_stats'
 # %% Arguments
-features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta']
+features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP']
 labels=[0,1,2]
 output='graph'
 epochs=10

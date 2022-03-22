@@ -69,7 +69,8 @@ def create_graph(fatjet,constit,feat):
     The `constit` is a structured array with information about the constituents.
     """
     # Global features are properties of the fat jet
-    globals=[]
+    f=['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
+    globals=[fatjet[m] for m in f]
 
     # Nodes are individual tracks
     nodes=np.array([np.abs(constit[x]) for x in feat]).T

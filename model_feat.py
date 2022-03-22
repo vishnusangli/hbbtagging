@@ -19,6 +19,7 @@ from hbbgbb import analysis
 from hbbgbb.models import SimpleModel
 STATSDIR = 'data_stats'
 MODELSTATS = 'model_stats'
+MODELDIR = 'saved_models'
 # %% Arguments
 features=['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
 output='feat'
@@ -126,4 +127,5 @@ plt.clf()
 # %% Calculate ROC curves
 analysis.roc(df, 'score0', f'roc_{output}')
 
-# %%
+# %% Save model
+tf.saved_model.save(mlp, f"{MODELDIR}/{output}")
