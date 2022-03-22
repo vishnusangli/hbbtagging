@@ -3,7 +3,6 @@
 #%autoreload 2
 
 # %%
-from re import M
 import sys
 from sklearn.covariance import MinCovDet
 

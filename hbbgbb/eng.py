@@ -1,22 +1,25 @@
 # %%
 import h5py
 import sys
+import glob
+from tqdm import tqdm
 
 import tensorflow as tf
 import sonnet as snt
 import matplotlib.pyplot as plt
 import numpy as np
-
 import pandas as pd
 
-import hbbgbb.plot as myplt
-from hbbgbb import data
-from hbbgbb import analysis
 
-from hbbgbb.models import SimpleModel
+
+from . import data
+from . import analysis
+
+sys.path.append("..")
 import settings
-import glob
-from tqdm import tqdm
+
+
+
 
 DATADIR = 'explore_output'
 IMG_SIZE = 15
@@ -112,7 +115,9 @@ isnanzero = np.vectorize(isnanzero)
 # %%
 
 class Feature_Eng:
-
+    """
+    Family of feature engineering variables for calorimeter pt data
+    """
     def double_log(data):
         """
         Uses a double rectified log with a +1 shift in between
@@ -120,7 +125,7 @@ class Feature_Eng:
         val = mylog(data)
         val += 1
         val = mylog(val)
-        maxval = np.max(data)
+        maxval = np.max(val)
         val = np.divide(val, maxval)
         return val
 
@@ -148,5 +153,18 @@ class Feature_Eng:
         val = mypow(data, factor)
         #val = np.divide(val, np.max(val))
         return val
+    
+    def sqrt_log(data):
+        """
+        Uses a rectified square root 
+        followed by rectified log
+        """
+        val = mypow(data, 0.5)
+        val -= 20
+        val = mylog(val)
+        maxval = np.max(val)
+        val = np.divide(val, maxval)
+        return val
 
     current = double_log
+# %%

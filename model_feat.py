@@ -106,19 +106,19 @@ for feature in features+['nConstituents']:
 
 # %%
 myplt.labels(df,'score0','label',fmt=fmt)
-plt.savefig(f'{MODELSTATS}/score0.png')
+plt.savefig(f'{MODELSTATS}/score0.pdf')
 plt.title(f"model {output} label0 - hbb")
 plt.show()
 plt.clf()
 # %%
 myplt.labels(df,'score1','label',fmt=fmt)
-plt.savefig(f'{MODELSTATS}/score1.png')
+plt.savefig(f'{MODELSTATS}/score1.pdf')
 plt.title(f"model {output} label1 - QCD(bb)")
 plt.show()
 plt.clf()
 # %%
 myplt.labels(df,'score2','label',fmt=fmt)
-plt.savefig(f'{MODELSTATS}/score2.png')
+plt.savefig(f'{MODELSTATS}/score2.pdf')
 plt.title(f"model {output} label2 - QCD(other)")
 plt.show()
 plt.clf()

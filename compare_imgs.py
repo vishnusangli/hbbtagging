@@ -39,13 +39,13 @@ def avg_img_perlabel(img_data, labels, name = 'avg_img_perlabel'):
         plt.yticks([])
         plt.imshow(cum_img)
         plt.title(f"label {i}")
-    plt.colorbar()
+        plt.colorbar()
     if len(name) > 0:
         plt.savefig(f'{DATADIR}/{name}.pdf')
     else:
         plt.show()
 # %%
-def test_dist(img_data, labels, func = eng.current):
+def test_dist(img_data, labels, func = eng.Feature_Eng.current):
     fig, ax = plt.subplots(3, 2, figsize = (12, 12))
     fig.patch.set_facecolor('white')
     for i in range(3):
@@ -63,5 +63,5 @@ def test_dist(img_data, labels, func = eng.current):
         n, b, p = ax1.hist(elems)
         ax1.set_title(f"label {i} Engineered")
     plt.tight_layout()
-    plt.title()
+    plt.suptitle(f"{func.__name__} Feature Engineering")
     plt.savefig(f"{DATADIR}/img_dist.pdf")

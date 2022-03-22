@@ -11,12 +11,12 @@ import numpy as np
 
 import pandas as pd
 
+import hbbgbb.analysis as analysis
 import hbbgbb.plot as myplt
-from hbbgbb import data
-from hbbgbb import analysis
-from hbbgbb import eng
+import hbbgbb.data as data
+import hbbgbb.eng as eng
 
-from hbbgbb.models import SimpleCNN
+import hbbgbb.models.SimpleCNN as SimpleCNN
 import compare_imgs
 
 from tqdm import tqdm
@@ -26,6 +26,7 @@ MODELSTATS = 'model_stats'
 # %% Arguments
 output='cnn'
 epochs= 10
+
 if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     import argparse
     parser = argparse.ArgumentParser(description='Train a CNN with calorimeter images')
@@ -62,20 +63,20 @@ class CNN_BatchTrainer:
         self.stat = pd.DataFrame(columns=['train_loss','test_loss'])
         self.opt = snt.optimizers.SGD(learning_rate=0.001)
         self.loss_fn = tf.losses.CategoricalCrossentropy(from_logits=True)
+
     def Batch_Trainer(self, data, label, start, end):
         batch_data, batch_label = data[start: end], label[start: end]
-        pred = self.model(batch_data, is_training = True)
         with tf.GradientTape() as tape:
+            pred = self.model(batch_data, is_training = True)
             loss = self.loss_fn(batch_label, pred)
 
             params = self.model.trainable_variables
             grads = tape.gradient(loss, params)
-
+            self.opt.apply(grads, params)
         return loss
 
 # %%
 shape = (eng.IMG_SIZE, eng.IMG_SIZE)
-
 train_data, train_label = tf.convert_to_tensor(train_data, dtype = tf.float32), tf.convert_to_tensor(train_label, dtype = tf.float32)
 test_data, test_label = tf.convert_to_tensor(test_data, dtype = tf.float32), tf.convert_to_tensor(test_label, dtype = tf.float32)
 
@@ -85,30 +86,31 @@ train_data.shape
 # %%
 t = CNN_BatchTrainer()
 # %%
-fig_s,ax_s=plt.subplots(ncols=3,figsize=(24,8))
 fig_t,ax_t=plt.subplots(figsize=(8,8))
 
 batch_size = 32
+
 epoch_stat=pd.DataFrame(columns=['train_loss', 'test_loss'])
 for epoch in tqdm(range(epochs)):
     for batch in range((train_data.shape[0]//batch_size) + 1):
         start, end = (batch * batch_size), min(batch_size * (batch + 1), train_data.shape[0])
         batch_loss = t.Batch_Trainer(train_data, train_label, start, end)
+
     with tf.GradientTape() as tape:
         pred = t.model(train_data)
         loss = t.loss_fn(train_label, pred)
+        
+        params = t.model.trainable_variables
+        grads = tape.gradient(loss, params)
+        t.opt.apply(grads, params)
 
         test_pred = t.model(test_data)
         test_loss = t.loss_fn(test_label, test_pred)
-        params = t.model.trainable_variables
-        grads = tape.gradient(loss, params)
-
-        t.opt.apply(grads, params)
-        loss = float(tf.reduce_mean(loss))
-        test_loss = float(tf.reduce_mean(test_loss))
-        epoch_stat = epoch_stat.append({'train_loss':float(loss), 'test_loss':float(test_loss)}, ignore_index=True)
+    loss = float(tf.reduce_mean(loss))
+    test_loss = float(tf.reduce_mean(test_loss))
+    epoch_stat = epoch_stat.append({'train_loss':float(loss), 'test_loss':float(test_loss)}, ignore_index=True)
     
-
+    
     # Plot the status of the training
     ax_t.clear()
     ax_t.plot(epoch_stat.train_loss,label='Training')
@@ -118,14 +120,12 @@ for epoch in tqdm(range(epochs)):
     ax_t.set_ylim(1e-1, 1e3)
     ax_t.set_xlabel('epoch')
     ax_t.legend()
+    plt.suptitle(f"model {output} training")
     fig_t.savefig(f'{MODELSTATS}/training.pdf')
 
-    # Plot the scores
-
-    #df_test['pred']=tf.argmax(pred.globals, axis=1)
 for tensor in t.model.trainable_variables:
     print("{} : {}".format(tensor.name, tensor.shape))
-
+# %%
 pred=t.model(test_data)
 df = pd.DataFrame(tf.argmax(pred, axis=1), columns = ['pred'])
 predsm=tf.nn.softmax(pred)
@@ -154,3 +154,5 @@ plt.show()
 plt.clf()
 # %%
 analysis.roc(df, 'score0', f'roc_{output}')
+
+# %%

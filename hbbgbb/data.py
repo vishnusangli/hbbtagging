@@ -1,5 +1,9 @@
 import glob
+import sys
+sys.path.append("..")
 import settings
+
+
 import numpy as np
 import pandas as pd
 import h5py
