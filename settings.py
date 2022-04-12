@@ -1,1 +1,5 @@
 datadir = '/global/projecta/projectdirs/atlas/zhicaiz/Hbb/h5'
+statsdir = 'data_stats'
+modelstats = 'model_stats'
+modeldir = 'saved_models'
+hbbgbb_dir = '/global/homes/v/vsangli/starters/hbbtagging/hbbgbb'

@@ -4,6 +4,7 @@ import sys
 import kkplot
 
 from . import plot as myplt
+from sklearn.metrics import auc
 
 ROC_DIR = "roc_curves"
 ROC_IMG = "roc_imgs"
@@ -52,3 +53,44 @@ def roc(df, score, output=None, plot=True):
     # Save ROC curves
     if output is not None:
         np.save(f'{ROC_DIR}/{output}.npy',rocs)
+
+
+def aoc(df, score):
+    """
+    Return area over roc curve
+    """
+    labels=sorted(df['label'].unique())
+    rocs={}
+
+    mymin=np.floor(df[score].min())
+    mymax=np.ceil(df[score].max())
+
+    for label in labels:
+        h,b=np.histogram(df[df.label==label][score],bins=100,range=(mymin,mymax))
+        h=1-np.cumsum(h)/np.sum(h) # turn into CDF
+        rocs[label]=h
+    area = [1 - auc(rocs[0], 1 - rocs[label]) for label in labels]
+    return area
+    
+def better_aoc(preds, real_labels, score = 0):
+    """
+    Avoiding the use of appending to data pd
+    Seems to be returning different values
+    """
+    labels = sorted(real_labels.unique())
+
+    rocs = {}
+    mymin = np.floor( np.min(preds[:, score]))
+    mymax = np.ceil(np.max(preds[:, score]))
+    for label in labels:
+        h, b = np.histogram(preds[real_labels == label, score], bins = 100, range = (mymin, mymax))
+        h = 1- np.cumsum(h)/np.sum(h)
+        rocs[label] = h
+    
+    area = [1-auc(rocs[0], 1- rocs[label]) for label in labels]
+    return area
+    
+    
+
+
+    

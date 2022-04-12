@@ -20,10 +20,9 @@ from hbbgbb import analysis
 from hbbgbb.models import graphs
 
 import settings
-STATSDIR = 'data_stats'
-MODELSTATS = 'model_stats'
+LOADMODEL = "simplenn"
 # %% Arguments
-features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP']
+features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_z0SinTheta', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
 labels=[0,1,2]
 output='graph'
 epochs=10
@@ -47,6 +46,7 @@ from hbbgbb import formatter
 fmt=formatter.Formatter('variables.yaml')
 
 # %% Load per jet information
+
 df_train=data.load_data()
 data.label(df_train)
 
@@ -63,10 +63,10 @@ l_test =tf.convert_to_tensor(df_test [strlabels])
 
 # %% Load jet constituent data
 fjc_train=data.load_data_constit()
-g_train=data.create_graphs(df_train, fjc_train,features)
+g_train=data.create_graphs(df_train, fjc_train,features, data.read(f"{settings.modeldir}/{LOADMODEL}-train"))
 
 fjc_test=data.load_data_constit('r9364')
-g_test =data.create_graphs(df_test , fjc_test ,features)
+g_test =data.create_graphs(df_test , fjc_test ,features, data.read(f"{settings.modeldir}/{LOADMODEL}-test"))
 
 #%% pltting code
 # gs=gn.utils_np.graphs_tuple_to_data_dicts(g_train)
@@ -144,7 +144,7 @@ for epoch in tqdm.trange(epochs):
     ax_t.set_ylim(1e-1, 1e3)
     ax_t.set_xlabel('epoch')
     ax_t.legend()
-    fig_t.savefig(f'{MODELSTATS}/training.pdf')
+    fig_t.savefig(f'{settings.modelstats}/training.pdf')
 
     # Plot the scores
     pred=t.model(g_test)
@@ -156,7 +156,7 @@ for epoch in tqdm.trange(epochs):
         ax_s[label].clear()
         myplt.labels(df_test,f'score{label}','label',fmt=fmt, ax=ax_s[label])
         ax_s[label].set_yscale('log')
-    fig_s.savefig(f'{MODELSTATS}/score.pdf')
+    fig_s.savefig(f'{settings.modelstats}/score.pdf')
 
 # %% Save output
 analysis.roc(df_test, 'score0', f'roc_{output}')
