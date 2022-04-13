@@ -9,6 +9,8 @@ from tqdm import tqdm
 
 from hbbgbb import data
 from hbbgbb import eng
+
+import graph_nets as gn
 EXP_OUT = "explore_output"
 # %%
 def iterate(df_train, fjc_train, first = 'pt', sec = 'trk_d0'):
@@ -172,6 +174,7 @@ def temp():
 #Params and features
 trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_z0SinTheta', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
 calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
+
 signals = ["1100", "1200", "1400"]
 backs = ["6", "7", "8"]
 tag = 'r10201'
@@ -180,19 +183,17 @@ strlabels=list(map(lambda l: f'label{l}', labels))
 
 #Load Data
 signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = tag)
-[data.label(i) for i in signal_arrs]
-[data.label(i) for i in backg_arrs]
-
-#Remove label 3/only required data
-signal_arrs = [i[np.any(i[strlabels], axis = 1)].copy() for i in signal_arrs]
-backg_arrs = [i[np.any(i[strlabels], axis = 1)].copy() for i in backg_arrs]
-
-# Combine and shuffle dataset into one
 master_arr = signal_arrs + backg_arrs
+[data.label(i) for i in master_arr]
+#Remove label 3/only required data
+master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
+# Combine and shuffle dataset into one
 master_data = [np.array(i[calo_features]) for i in master_arr]
 master_label = [np.array(i[strlabels]) for i in master_arr]
 master_label, master_data = data.merge_shuffle(master_label, master_data)
 
+
+true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
 # %%
 #Creating 1 graph for GraphNN
 trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_z0SinTheta', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
@@ -205,8 +206,21 @@ strlabels=list(map(lambda l: f'label{l}', labels))
 
 #Load fj data
 signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = tag)
+# %%
+# Label and filter wrt label 3
 [data.label(i) for i in signal_arrs]
 [data.label(i) for i in backg_arrs]
-
-
-
+signal_arrs = [i[np.any(i[strlabels], axis = 1)].copy() for i in signal_arrs]
+backg_arrs = [i[np.any(i[strlabels], axis = 1)].copy() for i in backg_arrs]
+# %%
+#generate graphs grouped per event
+signal_graphs = data.group_create_graphs(signal_arrs, new_sig_mass, trk_features, tag = tag)
+back_graphs = data.group_create_graphs(backg_arrs, new_bag_jx, trk_features, tag = tag)
+# %%
+#combine for shuffling
+signal_graphs.extend(back_graphs)
+# %%
+#Shuffle
+master_label = [np.array(i[strlabels + ['label']]) for i in master_arr]
+master_label, master_graphs = data.merge_shuffle(master_label, signal_graphs)
+master_graphs = gn.utils_tf.data_dicts_to_graphs_tuple(master_graphs)

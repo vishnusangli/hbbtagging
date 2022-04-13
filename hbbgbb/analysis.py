@@ -54,25 +54,46 @@ def roc(df, score, output=None, plot=True):
     if output is not None:
         np.save(f'{ROC_DIR}/{output}.npy',rocs)
 
+def bare_roc(preds:np.array, true_labels:np.array, score:int, output:str = None) -> None:
+    """
+    roc function with separate inputs, not in pd Dataframe
 
-def aoc(df, score):
+    with respect to the score elem number
+
+    Otherwise a copy
     """
-    Return area over roc curve
-    """
-    labels=sorted(df['label'].unique())
+    labels = preds.shape[0]
     rocs={}
 
-    mymin=np.floor(df[score].min())
-    mymax=np.ceil(df[score].max())
+    mymin=np.floor(preds[:, score].min())
+    mymax=np.ceil(preds[:, score].max())
 
-    for label in labels:
-        h,b=np.histogram(df[df.label==label][score],bins=100,range=(mymin,mymax))
+    for label in range(labels):
+        h,b=np.histogram(preds[true_labels==label, score],bins=100,range=(mymin,mymax))
         h=1-np.cumsum(h)/np.sum(h) # turn into CDF
         rocs[label]=h
-    area = [1 - auc(rocs[0], 1 - rocs[label]) for label in labels]
-    return area
+
+    fig, ax=plt.subplots(1,1,figsize=(8,6))
+    for label in labels:
+        if label==0: continue # this is signal
+        ax.plot(rocs[0],1-rocs[label],'-',label=myplt.mylabels.get(label,label))
+
+    ax.set_xlabel('Signal Efficiency')
+    ax.set_ylabel('Background Rejection')
+    kkplot.ticks(ax.xaxis, 0.1, 0.02)
+    kkplot.ticks(ax.yaxis, 0.1, 0.02)
+    ax.set_xlim(0,1)
+    ax.set_ylim(0,1)
+    fig.legend(title='Background')
+    fig.tight_layout()
+    if output is not None:
+        fig.savefig(f"{ROC_DIR}/{ROC_IMG}/{output}.pdf")
+    fig.show()
+    if output is not None:
+        np.save(f'{ROC_DIR}/{output}.npy',rocs)
+
     
-def better_aoc(preds, real_labels, score = 0):
+def aoc(preds, real_labels, score = 0):
     """
     Avoiding the use of appending to data pd
     Seems to be returning different values

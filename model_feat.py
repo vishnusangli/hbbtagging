@@ -73,7 +73,7 @@ def step(feat,labels, label_col):
   """Performs one optimizer step on a single mini-batch."""
   with tf.GradientTape() as tape:
     logits = mlp(feat, is_training=True)
-    aoc = analysis.better_aoc(np.array(tf.nn.softmax(logits)), label_col, score = 0)
+    aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), label_col, score = 0)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
                                                           labels=labels)
     loss = tf.reduce_mean(loss)
@@ -90,7 +90,7 @@ def gen_testloss(feat, labels, label_col):
   """
   with tf.GradientTape() as tape:
     logits = mlp(feat)
-    aoc = analysis.better_aoc(np.array(tf.nn.softmax(logits)), label_col, score = 0)
+    aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), label_col, score = 0)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
                                                           labels=labels)
     loss = tf.reduce_mean(loss)
@@ -189,11 +189,3 @@ plt.clf()
 
 # %% Calculate ROC curves
 analysis.roc(df_test, 'score0', f'roc_{output}')
-
-# %% Save model
-
-  # %%
-analysis.aoc(df_test, 'score0')
-# %%
-
-# %%

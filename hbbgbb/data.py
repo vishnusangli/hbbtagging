@@ -18,6 +18,7 @@ LOADMODEL = "simplenn"
 sys.path.append("..")
 import settings
 # %%
+### READING EVENT DATA ###
 def load_data(tag='r10201'):
     """
     Load fat jet data into a Dataframe. Basic pre-selection is applied.
@@ -144,6 +145,8 @@ def load_data_constit(tag='r10201'):
     f=h5py.File(path, 'r')
     return f['fat_jet_constituents']
 
+
+### GENERATING GRAPHS ###
 def create_graph(fatjet,constit,feat, glob = []):
     """
     Create a dictionary graph for a large R jet. The graph is taken to be fully
@@ -193,15 +196,15 @@ def create_graphs(fatjets, constits, feat, glob_vars = None):
 
     return gn.utils_tf.data_dicts_to_graphs_tuple(dgraphs)
 # %%
-def group_create_graphs(fj_list, names, feat, glob_vars = None, tag = 'r10201', type = "signal"):
+def group_create_graphs(fj_list:list, names:list, feat:list, glob_vars:list = None, tag:str = 'r10201', type:str = "signal"):
     """
-    Wrapper function for create_graphs that contains and runs for all
-    """
-    def load_constit(name):
-        path=glob.glob(f'{settings.datadir}/{name}/*.output.h5')[0]
-        f=h5py.File(path, 'r')
-        return f['fat_jet_constituents']
+    Parent function that generates graphs for numerous events of a particular type (signal, background) \\
+    Opens fat jet constituents and obtains track data, using fat jet feature input to create graphs
 
+
+    Currently outputs a general array of arrays of all graphs per event. Would need to be evenly shuffled b/w 
+    signal & background before created into graphs_tuple data structure
+    """
     def find_file(part1, tag, rd):
         """
         parses through a txt file of ls and obtains the required file's string
@@ -220,30 +223,40 @@ def group_create_graphs(fj_list, names, feat, glob_vars = None, tag = 'r10201', 
         f=h5py.File(path, 'r')
         return f
     
+    def single_graph_create(fatjets, constits, feat, glob_vars = None):
+        """
+        Sub function that appends all event-generated graphs to the graph_arr.
+        Will convert the entire dataset to a Graph once all graphs from all events are appended
+
+        Otherwise identical to create_graphs
+        """
+        constits=constits[fatjets.index.values]
+        dgraphs = []
+        for (i,fatjet),constit,gl in tqdm.tqdm(zip(fatjets.iterrows(),constits, glob_vars),total=len(fatjets.index)):
+            constit=constit[~np.isnan(constit['pt'])]
+            dgraphs.append(create_graph(fatjet, constit, feat, gl))
+        return dgraphs
+    
     rd = pd.read_csv(f"{settings.hbbgbb_dir}/datafiles.txt")
     rd = np.array(rd.zhicaiz)
     graphs = []
-    if type == "signal":
-        for i in tqdm.tqdm(range(len(names))):
+    print("start?")
+    for i in range(len(names)):
+        print(names[i])
+        if type == "signal":
             name = find_file(f"_c10_M{names[i]}.", tag, rd)
-            constit = open_constit(name)
-            temp_graph = create_graph(fj_list[i], constit['fat_jet_constituents'], feat, glob_vars)
-            constit.close()
-            graphs.append(temp_graph)
-    else:
-        for i in tqdm.tqdm(range(len(names))):
+        else:
             name = find_file(f"jetjet_JZ{i}W.", tag, rd)
-            constit = open_constit(name)
-            temp_graph = create_graph(fj_list[i], constit['fat_jet_constituents'], feat, glob_vars)
-            constit.close()
-            graphs.append(temp_graph)
-    
+        path = glob.glob(f'{settings.datadir}/{name}/*.output.h5')[0]
+        constit=h5py.File(path, 'r')
+
+        temp_graph = single_graph_create(fj_list[i], constit['fat_jet_constituents'], feat, glob_vars)
+        constit.close()
+        graphs.append(temp_graph)
     return graphs
-
-
-
 # %%
-## Abstract the current system for storing arrays -- usually predictions
+### STORING AND READING FILES ###
+
 def write(name, arr):
     """
     
@@ -258,6 +271,7 @@ def read(name):
         result = pickle.load(infile)
     return result
 # %%
+
 def merge_shuffle(labels, graphs, seed = 0):
     """
     Uses an iterative merge shuffle method that parses 
@@ -268,7 +282,6 @@ def merge_shuffle(labels, graphs, seed = 0):
     Paired shuffling method that accordingly does two (label, graph). 
     """
     num_arrs =len(labels)
-    
     index_arrs = [0 for i in labels]
     total_size = np.sum([len(a) for a in labels])
     def give_probs(index_arrs):
@@ -309,6 +322,3 @@ def find_file(part1, tag, rd):
         print(f"found {len(curr)} objects matching file filter part {part1}, tag: {tag}")
         return ""
     return curr[0]
-# %%
-
-# %%
