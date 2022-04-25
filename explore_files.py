@@ -176,7 +176,7 @@ trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagI
 calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
 
 signals = ["1100", "1200", "1400"]
-backs = ["6", "7", "8"]
+backs = ["6", "5"]
 tag = 'r10201'
 labels = [0, 1, 2]
 strlabels=list(map(lambda l: f'label{l}', labels))
@@ -196,31 +196,24 @@ master_label, master_data = data.merge_shuffle(master_label, master_data)
 true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
 # %%
 #Creating 1 graph for GraphNN
-trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_z0SinTheta', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
+trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
 calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
-signals = ["1100", "1200", "1400", "1600"]
-backs = ["6", "7"]
+signals = ["1100", "1200", "1400"]
+backs = ["5", "6"]
 tag = 'r10201'
 labels = [0, 1, 2]
 strlabels=list(map(lambda l: f'label{l}', labels))
+# %%
+loader = data.GraphLoader(signals, backs)
 
-#Load fj data
-signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = tag)
 # %%
-# Label and filter wrt label 3
-[data.label(i) for i in signal_arrs]
-[data.label(i) for i in backg_arrs]
-signal_arrs = [i[np.any(i[strlabels], axis = 1)].copy() for i in signal_arrs]
-backg_arrs = [i[np.any(i[strlabels], axis = 1)].copy() for i in backg_arrs]
+num_batches = 0
+total_l = []
+while not loader.is_finished():
+    g, l = loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
+    total_l.extend(l)
+    num_batches += 1
 # %%
-#generate graphs grouped per event
-signal_graphs = data.group_create_graphs(signal_arrs, new_sig_mass, trk_features, tag = tag)
-back_graphs = data.group_create_graphs(backg_arrs, new_bag_jx, trk_features, tag = tag)
+total_l = np.array(total_l)
+det_dist(total_l, batch_size=10000, logits = True)
 # %%
-#combine for shuffling
-signal_graphs.extend(back_graphs)
-# %%
-#Shuffle
-master_label = [np.array(i[strlabels + ['label']]) for i in master_arr]
-master_label, master_graphs = data.merge_shuffle(master_label, signal_graphs)
-master_graphs = gn.utils_tf.data_dicts_to_graphs_tuple(master_graphs)

@@ -1,5 +1,6 @@
 # %%
 import glob
+from symtable import SymbolTable
 import sys
 
 
@@ -196,7 +197,7 @@ def create_graphs(fatjets, constits, feat, glob_vars = None):
 
     return gn.utils_tf.data_dicts_to_graphs_tuple(dgraphs)
 # %%
-def group_create_graphs(fj_list:list, names:list, feat:list, glob_vars:list = None, tag:str = 'r10201', type:str = "signal"):
+def group_create_graphs(fj_list:list, names:list, feat:list, glob_vars:list = None, tag:str = 'r10201', type:str = "signal", fil_col: str = 'pt'):
     """
     Parent function that generates graphs for numerous events of a particular type (signal, background) \\
     Opens fat jet constituents and obtains track data, using fat jet feature input to create graphs
@@ -215,45 +216,128 @@ def group_create_graphs(fj_list:list, names:list, feat:list, glob_vars:list = No
             print(f"found {len(curr)} objects matching file filter part {part1}, tag: {tag}")
             return ""
         return curr[0]
-    def open_constit(name):
-        """
-        Open file with key "fat jet constituents"
-        """
-        path = glob.glob(f'{settings.datadir}/{name}/*.output.h5')[0]
-        f=h5py.File(path, 'r')
-        return f
     
-    def single_graph_create(fatjets, constits, feat, glob_vars = None):
+    def single_graph(fatjet, constit, feat, glob_vars):
+        globals = glob_vars
+
+        # Nodes are individual tracks
+        nodes=np.array(constit)
+
+        # Fully connected graph, w/o loops
+        i=itertools.product(range(nodes.shape[0]),range(nodes.shape[0]))
+        senders=[]
+        receivers=[]
+        for s,r in i:
+            if s==r: continue
+            senders.append(s)
+            receivers.append(r)
+        edges=[[]]*len(senders)
+
+        return {'globals':globals, 'nodes':nodes, 'edges':edges, 'senders':senders, 'receivers':receivers}
+    
+    def single_event_create(fatjets, constits, feat, glob_vars = None):
         """
         Sub function that appends all event-generated graphs to the graph_arr.
         Will convert the entire dataset to a Graph once all graphs from all events are appended
 
         Otherwise identical to create_graphs
         """
-        constits=constits[fatjets.index.values]
+        #constits=constits[fatjets.index.values] #bottleneck
         dgraphs = []
         for (i,fatjet),constit,gl in tqdm.tqdm(zip(fatjets.iterrows(),constits, glob_vars),total=len(fatjets.index)):
-            constit=constit[~np.isnan(constit['pt'])]
-            dgraphs.append(create_graph(fatjet, constit, feat, gl))
+            constit=constit[~np.isnan(constit[:, 0])] #Use first column as indicator
+            dgraphs.append(single_graph(fatjet, constit, feat, gl))
         return dgraphs
     
     rd = pd.read_csv(f"{settings.hbbgbb_dir}/datafiles.txt")
     rd = np.array(rd.zhicaiz)
     graphs = []
-    print("start?")
     for i in range(len(names)):
         print(names[i])
         if type == "signal":
             name = find_file(f"_c10_M{names[i]}.", tag, rd)
         else:
-            name = find_file(f"jetjet_JZ{i}W.", tag, rd)
+            name = find_file(f"jetjet_JZ{names[i]}W.", tag, rd)
+        # Read constit file
         path = glob.glob(f'{settings.datadir}/{name}/*.output.h5')[0]
         constit=h5py.File(path, 'r')
 
-        temp_graph = single_graph_create(fj_list[i], constit['fat_jet_constituents'], feat, glob_vars)
+        #Convert to np array
+        use_constit = np.array(constit['fat_jet_constituents'])
+
+        # Zip to each track's features (num events, 100, track chars)
+        temp_arr = np.dstack([use_constit[i][fj_list[i].index.values] for i in feat])
+        temp_graph = single_event_create(fj_list[i], temp_arr, feat, glob_vars)
         constit.close()
         graphs.append(temp_graph)
     return graphs
+
+class LoadGraph:
+    def master_load(fj_list:list, names:list, feat:list, glob_vars:list = [], tag:str = 'r10201', type:str = "signal") -> list:
+        graphs = []
+
+        for i in range(len(names)):
+            print(names[i])
+            curr_fj = fj_list[i]
+            if type == "signal":
+                name = find_file(f"_c10_M{names[i]}.", tag)
+            else:
+                name = find_file(f"jetjet_JZ{names[i]}W.", tag)
+            path = glob.glob(f'{settings.datadir}/{name}/*.output.h5')[0]
+            f=h5py.File(path, 'r')
+            constits = np.array(f['fat_jet_constituents'])
+
+            constits = np.dstack([constits[i][curr_fj.index.values] for i in feat])
+            temp_graph = LoadGraph.gen_single_event(curr_fj, constits, feat, glob_vars)
+            f.close()
+            graphs.append(temp_graph)
+        return graphs
+
+    def create_single_graph(fatjet, constit, feat, glob_vars = []):
+        globals = glob_vars
+
+        # Nodes are individual tracks
+        nodes=np.array(constit)
+
+        # Fully connected graph, w/o loops
+        i=itertools.product(range(nodes.shape[0]),range(nodes.shape[0]))
+        senders=[]
+        receivers=[]
+        for s,r in i:
+            if s==r: continue
+            senders.append(s)
+            receivers.append(r)
+        edges=[[]]*len(senders)
+
+        return {'globals':globals, 'nodes':nodes, 'edges':edges, 'senders':senders, 'receivers':receivers}
+
+    def gen_single_event(fatjets, constits, feat, glob_vars = []):
+        """
+        Sub function that appends all event-generated graphs to the graph_arr.
+        Will convert the entire dataset to a Graph once all graphs from all events are appended
+
+        Otherwise identical to create_graphs
+        """
+        #constits=constits[fatjets.index.values] #bottleneck
+        dgraphs = []
+        if len(glob_vars) != len(fatjets):
+            for (i,fatjet),constit in tqdm.tqdm(zip(fatjets.iterrows(),constits),total=len(fatjets.index)):
+                constit=constit[~np.isnan(constit[:, 0])] #Use first column as indicator
+                dgraphs.append(LoadGraph.create_single_graph(fatjet, constit, feat))
+        else:
+            for (i,fatjet),constit, gl in tqdm.tqdm(zip(fatjets.iterrows(),constits, glob_vars),total=len(fatjets.index)):
+                constit=constit[~np.isnan(constit[:, 0])] #Use first column as indicator
+                dgraphs.append(LoadGraph.create_single_graph(fatjet, constit, feat, gl))
+
+        return dgraphs
+
+    def biased_single_event(fatjets, constits, feat):
+        dgraphs = [[], [], []]
+        for (i,fatjet),constit in tqdm.tqdm(zip(fatjets.iterrows(),constits),total=len(fatjets.index)):
+            constit=constit[~np.isnan(constit[:, 0])] #Use first column as indicator
+            label = fatjet.label
+            dgraphs[label].append(LoadGraph.create_single_graph(fatjet, constit, feat))
+        return dgraphs
 # %%
 ### STORING AND READING FILES ###
 
@@ -297,17 +381,17 @@ def merge_shuffle(labels, graphs, seed = 0):
     np.random.seed(seed)
     while np.sum(index_arrs) < total_size:
         probs = give_probs(index_arrs)
-        rand = np.random.random()
-        for i in range(1000):
-            for elem in range(len(probs) - 1, -1, -1):
+        for i in range(100):
+            rand = np.random.random()
+            for elem in range(len(probs)):
                 if rand <= probs[elem] and index_arrs[elem] < len(labels[elem]):
                     master_label.append(labels[elem][index_arrs[elem]])
                     master_graphs.append(graphs[elem][index_arrs[elem]])
                     index_arrs[elem] += 1
                     master_elem += 1
-    return master_label, master_graphs
+    return master_graphs, master_label
 # %%
-def find_file(part1, tag, rd):
+def find_file(part1, tag):
     """
     parses through a txt file of ls and obtains the required file's string
 
@@ -316,9 +400,107 @@ def find_file(part1, tag, rd):
 
     rd -- ls dump array
     """
+    rd = pd.read_csv(f"{settings.hbbgbb_dir}/datafiles.txt")
+    rd = np.array(rd.zhicaiz)
     curr = rd[[part1 in i for i in rd]]
     curr = curr[[tag in i for i in curr]]
     if len(curr) != 1:
         print(f"found {len(curr)} objects matching file filter part {part1}, tag: {tag}")
         return ""
     return curr[0]
+
+def load_fjc(name):
+    path = glob.glob(f'{settings.datadir}/{name}/*.output.h5')[0]
+    constit=h5py.File(path, 'r')
+    return constit
+
+class GraphLoader:
+    def __init__(self, signals, backgrounds, tag = 'r10201', labels = 3) -> None:
+        """
+        Take label 0 from signal
+        use weighted func to take from backs
+        1 of each at a tmie
+        """
+        self.tag = tag
+        self.num_labels = labels
+        temp = self.combine(signals, "hh_bbbb") + self.combine(backgrounds, "jetjet")
+        self.available = [self.combine(signals, "hh_bbbb"), temp, temp.copy()]
+        self.finished = False
+
+        self.dict_files = [None for i in range(labels)]
+        for i in range(labels):
+            self.refill_label(i)
+
+    def combine(self, files, part):
+        temp = [part] * len(files)
+        return list(zip(files.copy(), temp))
+    def load_file(self, filename):
+        with open(filename, 'rb') as f:
+            list_of_dicts = pickle.load(f)
+        return list_of_dicts
+    
+    def fill_data(self, label, file, sampletype = "hh_bbbb"):
+        file = f"hbbgbb/{settings.graphs}/{self.tag}_{sampletype}_{file}/label_{label}.pkl"
+        dicts = self.load_file(f"{file}")
+        self.dict_files[label] = [dicts, 0]
+
+    def refill_label(self, label):
+        label_available = self.available[label]
+        if len(label_available) > 0:
+                file = label_available.pop()
+                self.fill_data(label, file[0], sampletype = file[1])
+        else:
+            print(f"Samples for label {label} depleted")
+            self.finished = True
+        
+    
+
+    def give_batch(self, label_ratio = [0.47, 0.6, 0.47], batch_size = 10000):
+        nums = [int(i * batch_size) for i in label_ratio]
+        labels, graphs = [], []
+        for i in range(len(nums)):
+            curr_graphs, curr_labels = self.give_data(i, nums[i])
+            labels.append(curr_labels)
+            graphs.append(curr_graphs)
+        if self.finished:
+            return [], []
+        g, l = merge_shuffle(labels, graphs)
+        return gn.utils_np.data_dicts_to_graphs_tuple(g), l
+
+    def give_data(self, label, num_jets, lab = True):
+        """
+        Return a given label's jets and change iter
+        """
+        ##Assume it is length 1 right now
+        
+        label_arr = self.dict_files[label]
+        start, end = label_arr[1], label_arr[1] + num_jets
+        if self.finished:
+            return [], []
+
+        if len(label_arr[0]) < end:
+            dicts = label_arr[0][start: len(label_arr[0])]
+            diff = end - len(label_arr[0])
+            self.dict_files[label] = None
+            self.refill_label(label)
+            if not self.finished:
+                dicts_new, t = self.give_data(label, diff, False)
+                dicts = dicts + dicts_new
+            else:
+                num_jets = num_jets - diff
+        else:
+            dicts = label_arr[0][start:end]
+            label_arr[1] = end
+
+        if not lab:
+            num_jets = 0
+        return dicts, self.gen_logits(label, num_jets)
+
+    def gen_logits(self, label, size):
+        if size == 0:
+            return []
+        temp = np.dstack([np.zeros(size) + i for i in range(3)])
+        to_return = temp[0]==label
+        return to_return
+    def is_finished(self):
+        return self.finished
