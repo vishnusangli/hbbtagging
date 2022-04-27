@@ -54,7 +54,7 @@ def roc(df, score, output=None, plot=True):
     if output is not None:
         np.save(f'{ROC_DIR}/{output}.npy',rocs)
 
-def bare_roc(preds:np.array, true_labels:np.array, score:int, output:str = None) -> None:
+def bare_roc(preds, true_labels:np.array, score:int, output:str = None) -> None:
     """
     roc function with separate inputs, not in pd Dataframe
 
@@ -62,9 +62,8 @@ def bare_roc(preds:np.array, true_labels:np.array, score:int, output:str = None)
 
     Otherwise a copy
     """
-    labels = preds.shape[0]
+    labels = preds.shape[1]
     rocs={}
-
     mymin=np.floor(preds[:, score].min())
     mymax=np.ceil(preds[:, score].max())
 
@@ -74,10 +73,9 @@ def bare_roc(preds:np.array, true_labels:np.array, score:int, output:str = None)
         rocs[label]=h
 
     fig, ax=plt.subplots(1,1,figsize=(8,6))
-    for label in labels:
+    for label in range(labels):
         if label==0: continue # this is signal
         ax.plot(rocs[0],1-rocs[label],'-',label=myplt.mylabels.get(label,label))
-
     ax.set_xlabel('Signal Efficiency')
     ax.set_ylabel('Background Rejection')
     kkplot.ticks(ax.xaxis, 0.1, 0.02)

@@ -499,8 +499,8 @@ class GraphLoader:
     def gen_logits(self, label, size):
         if size == 0:
             return []
-        temp = np.dstack([np.zeros(size) + i for i in range(3)])
-        to_return = temp[0]==label
-        return to_return
+        temp = np.ones(size, dtype = int) * label
+        return temp
+
     def is_finished(self):
         return self.finished

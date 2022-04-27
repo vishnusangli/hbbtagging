@@ -42,26 +42,42 @@ from hbbgbb import formatter
 fmt=formatter.Formatter('variables.yaml')
 
 # %% Load the datset
-df=data.load_data()
-data.label(df)
+signals = ["1200", "1400"]
+backs = ["6"]
+labels = [0, 1, 2]
+strlabels=list(map(lambda l: f'label{l}', labels))
+ # %%
+signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = 'r10201')
+master_arr = signal_arrs + backg_arrs
+[data.label(i) for i in master_arr]
+#Remove label 3/only required data
+master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
+# Combine and shuffle dataset into one
+master_data = [np.array(i[features]) for i in master_arr]
+master_label = [np.array(i[strlabels]) for i in master_arr]
+master_data, master_label = data.merge_shuffle(master_label, master_data)
 
-df_test=data.load_data('r9364')
-data.label(df_test)
 
-
+test_true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
 # %% Create tensors of features
-feat=tf.convert_to_tensor(df[features])
-labels=tf.convert_to_tensor(df.label)
+test_feat=tf.convert_to_tensor(master_data)
+test_label=tf.convert_to_tensor(test_true_labels)
 
-test_feat=tf.convert_to_tensor(df_test[features])
-test_label=tf.convert_to_tensor(df_test.label)
-
-# %% Create features
-for feature in features+['nConstituents']:
-  myplt.labels(df, feature, 'label', fmt=fmt)
-  plt.savefig(f'{STATSDIR}/labels_{feature}.pdf')
-  plt.show()
-  plt.clf()
+# %%
+# Training Dataset
+signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = 'r9364')
+master_arr = signal_arrs + backg_arrs
+[data.label(i) for i in master_arr]
+#Remove label 3/only required data
+master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
+# Combine and shuffle dataset into one
+master_data = [np.array(i[features]) for i in master_arr]
+master_label = [np.array(i[strlabels]) for i in master_arr]
+master_data, master_label = data.merge_shuffle(master_label, master_data)
+# %%
+train_true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
+feat=tf.convert_to_tensor(master_data)
+labels=tf.convert_to_tensor(train_true_labels)
 
 # %%
 mlp=SimpleModel.SimpleModel()
@@ -73,7 +89,7 @@ def step(feat,labels, label_col):
   """Performs one optimizer step on a single mini-batch."""
   with tf.GradientTape() as tape:
     logits = mlp(feat, is_training=True)
-    aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), label_col, score = 0)
+    aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), pd.Series(label_col), score = 0)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
                                                           labels=labels)
     loss = tf.reduce_mean(loss)
@@ -90,7 +106,7 @@ def gen_testloss(feat, labels, label_col):
   """
   with tf.GradientTape() as tape:
     logits = mlp(feat)
-    aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), label_col, score = 0)
+    aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), pd.Series(label_col), score = 0)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
                                                           labels=labels)
     loss = tf.reduce_mean(loss)
@@ -99,9 +115,9 @@ def gen_testloss(feat, labels, label_col):
 # %% Training
 df_stat=pd.DataFrame(columns=['epoch','loss', 'test_loss', 'aoc_gbb', 'aoc_other', 'test_aoc_gbb', 'test_aoc_other'])
 for epoch in tqdm(range(epochs)):
-    loss, aoc =step(feat,labels, df.label)
+    loss, aoc =step(feat,labels, train_true_labels)
   
-    test_loss, test_aoc = gen_testloss(test_feat, test_label, df_test.label)
+    test_loss, test_aoc = gen_testloss(test_feat, test_label, test_true_labels)
 
     df_stat=df_stat.append({'epoch':epoch,'loss':float(loss), 'test_loss':float(test_loss), 'aoc_gbb':float(aoc[0]), 'aoc_other':float(aoc[1]), 'test_aoc_gbb':float(test_aoc[0]), 'test_aoc_other':float(test_aoc[1])}, ignore_index=True)
 
@@ -147,45 +163,19 @@ plt.show()
 plt.clf()
 # %% Generating the predictions
 pred=mlp(feat)
-df['pred']=tf.argmax(pred, axis=1)
 predsm=tf.nn.softmax(pred)
 data.write(f"{MODELDIR}/{output}-train", predsm)
 del(predsm)
 del(pred)
 
 pred=mlp(test_feat)
-df_test['pred']=tf.argmax(pred, axis=1)
+
 predsm=tf.nn.softmax(pred)
 data.write(f"{MODELDIR}/{output}-test", predsm)
 
-df_test['score0']=predsm[:,0]
-df_test['score1']=predsm[:,1]
-df_test['score2']=predsm[:,2]
-# %% Plot distributions of the two predictions
-for feature in features+['nConstituents']:
-  myplt.labels(df_test, feature, 'label', 'pred', fmt=fmt)
-  plt.savefig(f'{STATSDIR}/predictions_{feature}.pdf')
-  plt.show()
-  plt.clf()
 
-# %%
-myplt.labels(df_test,'score0','label',fmt=fmt)
-plt.savefig(f'{MODELSTATS}/score0.pdf')
-plt.title(f"model {output} label0 - hbb")
-plt.show()
-plt.clf()
-# %%
-myplt.labels(df_test,'score1','label',fmt=fmt)
-plt.savefig(f'{MODELSTATS}/score1.pdf')
-plt.title(f"model {output} label1 - QCD(bb)")
-plt.show()
-plt.clf()
-# %%
-myplt.labels(df_test,'score2','label',fmt=fmt)
-plt.savefig(f'{MODELSTATS}/score2.pdf')
-plt.title(f"model {output} label2 - QCD(other)")
-plt.show()
-plt.clf()
+# %% Plot distributions of the two predictions
+
 
 # %% Calculate ROC curves
-analysis.roc(df_test, 'score0', f'roc_{output}')
+analysis.bare_roc(np.array(predsm), train_true_labels, 0, output)

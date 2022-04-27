@@ -46,27 +46,11 @@ from hbbgbb import formatter
 fmt=formatter.Formatter('variables.yaml')
 
 # %% Load per jet information
+trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
+calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
+signals = ["1100", "1200", "1400"]
+backs = ["5"]
 
-df_train=data.load_data()
-data.label(df_train)
-
-df_test=data.load_data('r9364')
-data.label(df_test)
-
-# %% Filter only specific labels
-df_train=df_train[np.any(df_train[strlabels],axis=1)].copy()
-df_test =df_test [np.any(df_test [strlabels],axis=1)].copy()
-
-# %% Create tensors of labels
-l_train=tf.convert_to_tensor(df_train[strlabels])
-l_test =tf.convert_to_tensor(df_test [strlabels])
-
-# %% Load jet constituent data
-fjc_train=data.load_data_constit()
-g_train=data.create_graphs(df_train, fjc_train,features, data.read(f"{settings.modeldir}/{LOADMODEL}-train"))
-
-fjc_test=data.load_data_constit('r9364')
-g_test =data.create_graphs(df_test , fjc_test ,features, data.read(f"{settings.modeldir}/{LOADMODEL}-test"))
 
 #%% pltting code
 # gs=gn.utils_np.graphs_tuple_to_data_dicts(g_train)
@@ -96,23 +80,28 @@ class Trainer:
         self.stat = pd.DataFrame(columns=['train_loss','test_loss'])
         self.opt  = snt.optimizers.Adam(learning_rate=0.1)
 
-    def step(self, graphs, labels, g_test=None, l_test=None):
+    def step(self, train_loader: data.GraphLoader, test_loader: data.GraphLoader):
         """Performs one optimizer step on a single mini-batch."""
         # Write test data
         test_loss=0.
-        if g_test is not None:
-            pred = self.model(g_test)
-            logits=pred.globals
+        if test_loader is not None:
+            while not test_loader.is_finished():
+                batch_g, batch_l = test_loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
+                pred = self.model(batch_g)
+            logits = pred.globals
             loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
-                                                            labels=l_test)
+                                                            labels=batch_l)
             test_loss = tf.reduce_mean(loss)
 
         # Training
         with tf.GradientTape() as tape:
-            pred = self.model(graphs)
+            while not train_loader.is_finished():
+                batch_g, batch_l = test_loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
+                pred = self.model(batch_g)
+
             logits=pred.globals
             loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
-                                                            labels=labels)
+                                                            labels=batch_l)
             loss = tf.reduce_mean(loss)
 
         params = self.model.trainable_variables
@@ -123,6 +112,26 @@ class Trainer:
         self.stat=self.stat.append({'train_loss':float(loss), 'test_loss':float(test_loss)}, ignore_index=True)
 
         return loss
+    
+    def test_model(self, test_loader):
+        
+        true_labels = []
+        preds = []
+        for i in range(3):
+            print(i)
+            batch_g, batch_l = test_loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
+            pred = self.model(batch_g)
+            preds.append(tf.nn.softmax(pred.globals))
+            true_labels.append(batch_l)
+        return np.concatenate(true_labels, axis = 0), np.concatenate(preds, axis = 0)
+
+        while not test_loader.is_finished():
+            batch_g, batch_l = test_loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
+            pred = self.model(batch_g)
+            preds.append(tf.nn.softmax(pred.globals))
+            true_labels.append(batch_l)
+
+        return np.concatenate(true_labels, axis = 0), np.concatenate(preds, axis = 0)
 
 # %% Prepare for training
 model = graphs.INModel(len(labels),2)
@@ -133,7 +142,10 @@ fig_s,ax_s=plt.subplots(ncols=3,figsize=(24,8))
 fig_t,ax_t=plt.subplots(figsize=(8,8))
 
 for epoch in tqdm.trange(epochs):
-    loss=float(t.step(g_train,l_train, g_test, l_test))
+    train_loader = data.GraphLoader(signals, backs)
+    test_loader = data.GraphLoader(signals, backs, tag = 'r9364')
+
+    loss=float(t.step(train_loader, test_loader))
 
     # Plot the status of the training
     ax_t.clear()
@@ -147,16 +159,7 @@ for epoch in tqdm.trange(epochs):
     fig_t.savefig(f'{settings.modelstats}/training.pdf')
 
     # Plot the scores
-    pred=t.model(g_test)
-    df_test['pred']=tf.argmax(pred.globals, axis=1)
-    predsm=tf.nn.softmax(pred.globals)
-    for label in labels:
-        df_test[f'score{label}']=predsm[:,label]
-
-        ax_s[label].clear()
-        myplt.labels(df_test,f'score{label}','label',fmt=fmt, ax=ax_s[label])
-        ax_s[label].set_yscale('log')
-    fig_s.savefig(f'{settings.modelstats}/score.pdf')
+true_labels, predsm = t.test_model(data.GraphLoader(signals, backs))
 
 # %% Save output
-analysis.roc(df_test, 'score0', f'roc_{output}')
+analysis.bare_roc(np.array(predsm), true_labels, 0, f'roc_{output}')

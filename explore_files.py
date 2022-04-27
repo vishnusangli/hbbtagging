@@ -176,10 +176,11 @@ trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagI
 calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
 
 signals = ["1100", "1200", "1400"]
-backs = ["6", "5"]
-tag = 'r10201'
+backs = ["6"]
 labels = [0, 1, 2]
 strlabels=list(map(lambda l: f'label{l}', labels))
+
+tag = 'r10201'
 
 #Load Data
 signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = tag)
@@ -190,7 +191,7 @@ master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
 # Combine and shuffle dataset into one
 master_data = [np.array(i[calo_features]) for i in master_arr]
 master_label = [np.array(i[strlabels]) for i in master_arr]
-master_label, master_data = data.merge_shuffle(master_label, master_data)
+master_data, master_label = data.merge_shuffle(master_label, master_data)
 
 
 true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
@@ -211,7 +212,7 @@ num_batches = 0
 total_l = []
 while not loader.is_finished():
     g, l = loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
-    total_l.extend(l)
+    total_l.extend(l) 
     num_batches += 1
 # %%
 total_l = np.array(total_l)
