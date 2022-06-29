@@ -25,12 +25,13 @@ class INModel(snt.Module):
         self.glayers = []
         for i in range(nglayers):
             graph_network = gn.modules.InteractionNetwork(
-                node_model_fn=lambda: snt.nets.MLP([2]),
-                edge_model_fn=lambda: snt.nets.MLP([2]),
+                node_model_fn=lambda: snt.nets.MLP([5]),
+                edge_model_fn=lambda: snt.nets.MLP([5]),
             )
+            self.glayers.append(graph_network)
 
         self.olayer = gn.modules.RelationNetwork(
-            edge_model_fn=lambda: snt.nets.MLP([2]),
+            edge_model_fn=lambda: snt.nets.MLP([5]),
             global_model_fn=lambda: snt.nets.MLP([nlabels])
         )
 

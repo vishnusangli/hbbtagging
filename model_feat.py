@@ -22,7 +22,7 @@ STATSDIR = 'data_stats'
 MODELSTATS = 'model_stats'
 MODELDIR = 'saved_models'
 # %% Arguments
-features=['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
+features=['C2','D2','e3','Tau32_wta','Split12','Split23', 'Xbb2020v2_QCD', 'Xbb2020v2_Higgs', 'Xbb2020v2_Top']
 output='feat'
 epochs=10
 if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
@@ -42,13 +42,21 @@ from hbbgbb import formatter
 fmt=formatter.Formatter('variables.yaml')
 
 # %% Load the datset
-signals = ["1200", "1400"]
-backs = ["6"]
+signals = ["1100", "1200"]
+backs = ["5"]
 labels = [0, 1, 2]
 strlabels=list(map(lambda l: f'label{l}', labels))
  # %%
+def craft_lens(signal_arrs, backg):
+    total_0len = sum(len(i) for i in signal_arrs)
+    backg = backg.iloc[:total_0len, :]
+    signal_arrs.append(backg)
+def distribution(label):
+  pass
+print("Training")
 signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = 'r10201')
-master_arr = signal_arrs + backg_arrs
+craft_lens(signal_arrs, backg_arrs[0])
+master_arr = signal_arrs 
 [data.label(i) for i in master_arr]
 #Remove label 3/only required data
 master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
@@ -56,29 +64,36 @@ master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
 master_data = [np.array(i[features]) for i in master_arr]
 master_label = [np.array(i[strlabels]) for i in master_arr]
 master_data, master_label = data.merge_shuffle(master_label, master_data)
+master_label = np.array(master_label)
+print([sum(master_label[:, i]) for i in range(3)])
 
-
-test_true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
+train_true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
 # %% Create tensors of features
-test_feat=tf.convert_to_tensor(master_data)
-test_label=tf.convert_to_tensor(test_true_labels)
+feat=tf.convert_to_tensor(master_data)
+labels= tf.convert_to_tensor(master_label)
 
 # %%
 # Training Dataset
-signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = 'r9364')
-master_arr = signal_arrs + backg_arrs
-[data.label(i) for i in master_arr]
-#Remove label 3/only required data
+print("Testing")
+signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx= backs, tag = 'r9364')
+
+craft_lens(signal_arrs, backg_arrs[0])
+master_arr = signal_arrs 
+temp = [data.label(i) for i in master_arr]
 master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
 # Combine and shuffle dataset into one
 master_data = [np.array(i[features]) for i in master_arr]
 master_label = [np.array(i[strlabels]) for i in master_arr]
 master_data, master_label = data.merge_shuffle(master_label, master_data)
+master_label = np.array(master_label)
+print([sum(master_label[:, i]) for i in range(3)])
 # %%
-train_true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
-feat=tf.convert_to_tensor(master_data)
-labels=tf.convert_to_tensor(train_true_labels)
+test_true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
+test_feat=tf.convert_to_tensor(master_data)
+test_label=tf.convert_to_tensor(master_label)
 
+signal_arrs, backg_arrs = None, None
+master_data, master_label = None, None
 # %%
 mlp=SimpleModel.SimpleModel()
 
@@ -90,7 +105,7 @@ def step(feat,labels, label_col):
   with tf.GradientTape() as tape:
     logits = mlp(feat, is_training=True)
     aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), pd.Series(label_col), score = 0)
-    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
+    loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
                                                           labels=labels)
     loss = tf.reduce_mean(loss)
 
@@ -107,7 +122,7 @@ def gen_testloss(feat, labels, label_col):
   with tf.GradientTape() as tape:
     logits = mlp(feat)
     aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), pd.Series(label_col), score = 0)
-    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
+    loss = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
                                                           labels=labels)
     loss = tf.reduce_mean(loss)
   return loss, aoc[1:]
@@ -178,4 +193,4 @@ data.write(f"{MODELDIR}/{output}-test", predsm)
 
 
 # %% Calculate ROC curves
-analysis.bare_roc(np.array(predsm), train_true_labels, 0, output)
+analysis.bare_roc(np.array(predsm), test_true_labels, 0, f"roc_{output}")

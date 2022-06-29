@@ -1,7 +1,4 @@
 # %%
-import h5py
-import tensorflow as tf
-import sonnet as snt
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -10,9 +7,9 @@ from tqdm import tqdm
 from hbbgbb import data
 from hbbgbb import eng
 
-import graph_nets as gn
 EXP_OUT = "explore_output"
 # %%
+mylabels={0:'Higgs',1:'QCD (bb)', 2:'QCD (other)'}
 def iterate(df_train, fjc_train, first = 'pt', sec = 'trk_d0'):
     """
     Confirm the mismatch (zeros) in track arrays with repsect to calorimeter arrays
@@ -119,7 +116,7 @@ def file_stats(fj_list, names, tp = "signal", num_labels = 4, tag = "r10201"):
         xlabel = "Mass"
         name = "signal"
     else:
-        xlabel = "Jx"
+        xlabel = "JZ Slice"
         name = "jetjet"
 
     ## Regular Plot
@@ -151,70 +148,118 @@ def file_stats(fj_list, names, tp = "signal", num_labels = 4, tag = "r10201"):
     plt.legend()
     plt.savefig(f"{EXP_OUT}/count_norm.pdf")
 
-
-
-
-
-def temp():
-    """
-    Temp function for easy use with copy-paste calls
-    """
-    features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_z0SinTheta', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
-
-    signals = ["1100", "1200", "1400"]
-    backs = ["6", "7", "8"]
-    tag = 'r10201'
-    signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = tag)
-
-    sig_graphs = data.group_create_graphs(signal_arrs, new_sig_mass, features)
-    back_graphs = data.group_create_graphs(backg_arrs, new_bag_jx, features, type = "back")
-    return sig_graphs, back_graphs, signal_arrs, backg_arrs, (new_sig_mass, new_bag_jx)
 # %%
-#Creating the Feature dataset for Feature NN
-#Params and features
-trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_z0SinTheta', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
-calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
-
-signals = ["1100", "1200", "1400"]
-backs = ["6"]
-labels = [0, 1, 2]
-strlabels=list(map(lambda l: f'label{l}', labels))
-
-tag = 'r10201'
-
-#Load Data
-signal_arrs, backg_arrs, new_sig_mass, new_bag_jx = data.load_newdata(sig_mass = signals, bag_jx=backs, tag = tag)
-master_arr = signal_arrs + backg_arrs
-[data.label(i) for i in master_arr]
-#Remove label 3/only required data
-master_arr = [i[np.any(i[strlabels], axis = 1)].copy() for i in master_arr]
-# Combine and shuffle dataset into one
-master_data = [np.array(i[calo_features]) for i in master_arr]
-master_label = [np.array(i[strlabels]) for i in master_arr]
-master_data, master_label = data.merge_shuffle(master_label, master_data)
-
-
-true_labels = tf.argmax(master_label, axis = 1) #used for roc curve
-# %%
-#Creating 1 graph for GraphNN
+mylabels={0:'Higgs',1:'QCD (bb)', 2:'QCD (other)'}
 trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
 calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
 signals = ["1100", "1200", "1400"]
-backs = ["5", "6"]
-tag = 'r10201'
-labels = [0, 1, 2]
-strlabels=list(map(lambda l: f'label{l}', labels))
-# %%
-loader = data.GraphLoader(signals, backs)
+backs = ["5"]
+# %% Load Data
+print(f"Load Training")
+train_loader = data.GraphLoader(signals, backs, graph_dir='ographs')
 
 # %%
-num_batches = 0
-total_l = []
-while not loader.is_finished():
-    g, l = loader.give_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=10000)
-    total_l.extend(l) 
-    num_batches += 1
+batch_size = 50000
+batch_g, batch_l = train_loader.give_dict_batch(label_ratio = [0.495, 0.1, 0.495], batch_size=batch_size, hist=False)
+labels = np.array(batch_l)
+trks = np.array([batch_g[i]["nodes"] for i in range(len(batch_g))])
 # %%
-total_l = np.array(total_l)
-det_dist(total_l, batch_size=10000, logits = True)
+### IMPORTANT
+num_jets = 2
+lens = []
+def single_val(arr, feature):
+    """
+    Reducing the array to a single value
+    max, avg, specific element
+    """
+    lens.append(len(arr))
+    return [arr[0]]
+
+def compare_jets(jets, labels, label = 0, unc=False):
+    """
+    Generate list of singular values for each jet
+    """
+    num_features = jets[0].shape[1]
+    comp_info = [[] for i in range(num_features)] 
+    l_jets = jets[labels[:, label]]
+    unc_ratios = [[], []] #d0, sintheta
+    for i in l_jets:
+        temp = np.array(i)
+        
+        for feat in range(num_features):
+            singular_vals = single_val(temp[:, feat], feat)
+            [comp_info[feat].append(i) for i in singular_vals]
+    comp_info = np.array(comp_info)
+    if unc:
+        d0_rat = comp_info[0, :]/comp_info[3, :]
+        sin_rat = comp_info[1, :]/comp_info[4, :]
+        mom_rat = comp_info[0, :]*comp_info[2, :]
+        return np.vstack([comp_info, d0_rat, sin_rat, mom_rat])
+    return comp_info
+#train_data, train_label = data.load_all(train_loader, num_batches = 7)
 # %%
+info = [compare_jets(trks, labels, label = i, unc = False) for i in range(3)]
+
+more_trk_features = trk_features + ["d0/Unc", "sinTheta/unc"]
+# %%
+max_lims = [1.795607, 1.9480603, 0.0019965656, 3.344233, 5.662956, 5.3698955, 4.6754017, 0]
+min_lims = [1.25, 1.3, 0, 1.3, 1, 1, 1, 0]
+
+max_vals = [0, 0, 0, 0, 0, 0, 0, 0]
+min_vals = [0, 0, 0, 0, 0, 0, 0, 0]
+
+outliers = [0, 0, 0, 0, 0, 0, 0, 0]
+plt.rcParams.update({'font.size': 14})
+num_imgs = len(info[0])
+f, ax = plt.subplots(2,4, figsize = (30, 10))
+b = ax.flatten()
+for l in range(3):
+    l_data = info[l]
+    for f in range(num_imgs):
+        b[f].hist(l_data[f], label = mylabels[l], density = True, histtype = "step", bins = np.linspace(min_lims[f], max_lims[f], 30))
+        outliers[f] += int(sum([i > max_lims[f] or i < min_lims[f] for i in l_data[f]]))
+        b[f].set_title(f"{more_trk_features[f]}")
+        b[f].set_yscale("log")
+        b[f].legend()
+        
+        curr_max = np.max(l_data[f])
+        curr_min = np.min(l_data[f])
+        if curr_max > max_vals[f]:
+            max_vals[f] = curr_max
+
+        if curr_min < min_vals[f]:
+            min_vals[f] = curr_min
+
+plt.suptitle(f"All tracks for jets (Batch size: {batch_size})")
+plt.savefig(f"{EXP_OUT}/data_stats.pdf")
+print(f"Num Outliers for each plot - {outliers}")
+print(f"Max {max_vals}")
+print(f"Min {min_vals}")
+# %%
+
+## any nans in dict
+def find_dict_nans(batch_dict):
+    places = []
+    for d in range(len(batch_dict)):
+        if np.any(np.isnan(batch_dict[d]['nodes'])):
+            places.append(d)
+    return places
+###any zeros
+def find_dict_zeros(batch_dict):
+    places = []
+    for d in range(len(batch_dict)):
+        if len(np.where(batch_dict[d]['nodes'] == 0)[0]) > 0:
+            places.append(d)
+    return places
+
+def find_diff_shape(batch_dict):
+    '''any nodes that are not shape (2, 7)'''
+    places = []
+    for d in range(len(batch_dict)):
+        if batch_dict[d]['nodes'].shape != (2, 7):
+            places.append(d)
+    return places
+# %%
+batch_dict = train_loader.give_dict_batch(hist = False)
+find_dict_nans(batch_dict[0])
+find_dict_zeros(batch_dict[0])

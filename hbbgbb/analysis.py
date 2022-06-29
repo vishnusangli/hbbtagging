@@ -54,7 +54,7 @@ def roc(df, score, output=None, plot=True):
     if output is not None:
         np.save(f'{ROC_DIR}/{output}.npy',rocs)
 
-def bare_roc(preds, true_labels:np.array, score:int, output:str = None) -> None:
+def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_roc = False, epoch_num = 0) -> None:
     """
     roc function with separate inputs, not in pd Dataframe
 
@@ -84,11 +84,14 @@ def bare_roc(preds, true_labels:np.array, score:int, output:str = None) -> None:
     ax.set_ylim(0,1)
     fig.legend(title='Background')
     fig.tight_layout()
-    if output is not None:
-        fig.savefig(f"{ROC_DIR}/{ROC_IMG}/{output}.pdf")
-    fig.show()
-    if output is not None:
-        np.save(f'{ROC_DIR}/{output}.npy',rocs)
+    if not epoch_roc:
+        if output is not None:
+            fig.savefig(f"{ROC_DIR}/{ROC_IMG}/{output}.pdf")
+        fig.show()
+        if output is not None:
+            np.save(f'{ROC_DIR}/{output}.npy',rocs)
+    else:
+        np.save(f'epochs/{output}_epoch-{epoch_num}.npy',rocs)
 
     
 def aoc(preds, real_labels, score = 0):
@@ -96,7 +99,7 @@ def aoc(preds, real_labels, score = 0):
     Avoiding the use of appending to data pd
     Seems to be returning different values
     """
-    labels = sorted(real_labels.unique())
+    labels = [0, 1, 2]
 
     rocs = {}
     mymin = np.floor( np.min(preds[:, score]))

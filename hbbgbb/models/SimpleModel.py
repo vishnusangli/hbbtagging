@@ -7,10 +7,12 @@ class SimpleModel(snt.Module):
         self.norm = snt.BatchNorm(True, True)
         self.hidden1 = snt.Linear(1024, name="hidden1")
         self.hidden2 = snt.Linear(1024, name="hidden2")
+        self.hidden3 = snt.Linear(1024, name="hidden3")
         self.logits = snt.Linear(3, name="logits")
     def __call__(self, data, is_training=False):
         output = self.norm(data, is_training=is_training)
         output = tf.nn.relu(self.hidden1(output))
         output = tf.nn.relu(self.hidden2(output))
+        output = tf.nn.relu(self.hidden3(output))
         output = self.logits(output)
         return output

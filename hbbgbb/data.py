@@ -12,12 +12,14 @@ import tqdm
 import graph_nets as gn
 import tensorflow as tf
 import pickle
+import matplotlib.pyplot as plt
 
 MODELDIR = 'saved_models'
 LOADMODEL = "simplenn"
 
 sys.path.append("..")
 import settings
+from hbbgbb import plot as myplot
 # %%
 ### READING EVENT DATA ###
 def load_data(tag='r10201'):
@@ -145,7 +147,9 @@ def load_data_constit(tag='r10201'):
     path=glob.glob(f'{settings.datadir}/user.zhicaiz.309450.NNLOPS_nnlo_30_ggH125_bb_kt200.hbbTrain.e6281_s3126_{tag}_p4258.2020_ftag5dev.v0_output.h5/*.output.h5')[0]
     f=h5py.File(path, 'r')
     return f['fat_jet_constituents']
-
+def isnanzero(x):
+    return np.isnan(x) or x == 0.
+isnanzero = np.vectorize(isnanzero)
 
 ### GENERATING GRAPHS ###
 def create_graph(fatjet,constit,feat, glob = []):
@@ -271,7 +275,7 @@ def group_create_graphs(fj_list:list, names:list, feat:list, glob_vars:list = No
         constit.close()
         graphs.append(temp_graph)
     return graphs
-
+    
 class LoadGraph:
     def master_load(fj_list:list, names:list, feat:list, glob_vars:list = [], tag:str = 'r10201', type:str = "signal") -> list:
         graphs = []
@@ -293,11 +297,29 @@ class LoadGraph:
             graphs.append(temp_graph)
         return graphs
 
-    def create_single_graph(fatjet, constit, feat, glob_vars = []):
+    def create_single_graph(fatjet, constit, feat, glob_vars = [], num_jets = None):
+        """
+        Generation of a single graph_dict. \n
+            `fatjet`: Dataframe row of jet
+            `constit`: np 2d array of track info
+            `feat`: track features
+            `glob_vars`: init global features. These are altered throughout the function
+            `num_jets`: upper bound on the number of jet
+
+        If number of jets is less than or equal to 1, graph creation is forfeited.
+        """
+        glob_vars.append(fatjet['mass'])
         globals = glob_vars
+        #fj_vars = ['Xbb2020v2_QCD', 'Xbb2020v2_Higgs', 'Xbb2020v2_Top']
+        #for elem in fj_vars:
+        #    globals.append(fatjet[elem])
 
         # Nodes are individual tracks
         nodes=np.array(constit)
+        if len(nodes) <= 1:
+            return False, []
+        if num_jets != None and nodes.shape[0] >= num_jets: 
+            nodes = nodes[:num_jets]
 
         # Fully connected graph, w/o loops
         i=itertools.product(range(nodes.shape[0]),range(nodes.shape[0]))
@@ -309,13 +331,12 @@ class LoadGraph:
             receivers.append(r)
         edges=[[]]*len(senders)
 
-        return {'globals':globals, 'nodes':nodes, 'edges':edges, 'senders':senders, 'receivers':receivers}
+        return True, {'globals':globals, 'nodes':nodes, 'edges':edges, 'senders':senders, 'receivers':receivers}
 
     def gen_single_event(fatjets, constits, feat, glob_vars = []):
         """
         Sub function that appends all event-generated graphs to the graph_arr.
         Will convert the entire dataset to a Graph once all graphs from all events are appended
-
         Otherwise identical to create_graphs
         """
         #constits=constits[fatjets.index.values] #bottleneck
@@ -334,7 +355,7 @@ class LoadGraph:
     def biased_single_event(fatjets, constits, feat):
         dgraphs = [[], [], []]
         for (i,fatjet),constit in tqdm.tqdm(zip(fatjets.iterrows(),constits),total=len(fatjets.index)):
-            constit=constit[~np.isnan(constit[:, 0])] #Use first column as indicator
+            constit=constit[~isnanzero(constit[:, 0])] #Use first column as indicator
             label = fatjet.label
             dgraphs[label].append(LoadGraph.create_single_graph(fatjet, constit, feat))
         return dgraphs
@@ -415,12 +436,13 @@ def load_fjc(name):
     return constit
 
 class GraphLoader:
-    def __init__(self, signals, backgrounds, tag = 'r10201', labels = 3) -> None:
+    def __init__(self, signals, backgrounds, tag = 'r10201', labels = 3, graph_dir = settings.graphs) -> None:
         """
         Take label 0 from signal
         use weighted func to take from backs
         1 of each at a tmie
         """
+        self.graph_dir = graph_dir
         self.tag = tag
         self.num_labels = labels
         temp = self.combine(signals, "hh_bbbb") + self.combine(backgrounds, "jetjet")
@@ -440,7 +462,7 @@ class GraphLoader:
         return list_of_dicts
     
     def fill_data(self, label, file, sampletype = "hh_bbbb"):
-        file = f"hbbgbb/{settings.graphs}/{self.tag}_{sampletype}_{file}/label_{label}.pkl"
+        file = f"hbbgbb/{self.graph_dir}/{self.tag}_{sampletype}_{file}/label_{label}.pkl"
         dicts = self.load_file(f"{file}")
         self.dict_files[label] = [dicts, 0]
 
@@ -453,9 +475,8 @@ class GraphLoader:
             print(f"Samples for label {label} depleted")
             self.finished = True
         
-    
-
-    def give_batch(self, label_ratio = [0.47, 0.6, 0.47], batch_size = 10000):
+    def give_dict_batch(self, label_ratio = [0.47, 0.06, 0.47], batch_size = 10000, hist = True, 
+    trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']):
         nums = [int(i * batch_size) for i in label_ratio]
         labels, graphs = [], []
         for i in range(len(nums)):
@@ -465,7 +486,18 @@ class GraphLoader:
         if self.finished:
             return [], []
         g, l = merge_shuffle(labels, graphs)
-        return gn.utils_np.data_dicts_to_graphs_tuple(g), l
+
+        if hist:
+            display_batch_jets(np.array(labels), np.array([g[i]["nodes"] for i in range(len(graphs))]))
+        return g, l
+
+
+    def give_batch(self, label_ratio = [0.47, 0.06, 0.47], batch_size = 10000):
+        g, l = self.give_dict_batch(label_ratio, batch_size, hist = False)
+        if len(l) > 0:
+            return gn.utils_tf.data_dicts_to_graphs_tuple(g), l
+        else:
+            return [], []
 
     def give_data(self, label, num_jets, lab = True):
         """
@@ -499,8 +531,63 @@ class GraphLoader:
     def gen_logits(self, label, size):
         if size == 0:
             return []
-        temp = np.ones(size, dtype = int) * label
-        return temp
+        
+        temp = [np.ones(size, dtype = int) * i for i in range(3)]
+        temp = [i == label for i in temp]
+        return np.dstack(temp)[0]
 
     def is_finished(self):
         return self.finished
+
+def load_all(loader: GraphLoader, batch_size: int = 10000, num_batches:int = 200):
+    """
+    Load all batches of a given dataset. Returned as a list of np arrays for 
+    batch graphs and labels
+    """
+    total_g, total_l = [], []
+    num = 1
+    while not loader.is_finished():
+        if num > num_batches: break
+        print(f"Batch {num}")
+        batch_g, batch_l = loader.give_batch(label_ratio = [0.497, 0.06, 0.497], batch_size=batch_size)
+        if len(batch_l) > 0:
+            total_g.extend([batch_g])
+            total_l.extend([np.array(batch_l)])
+
+        num += 1
+    return total_g, total_l
+
+def display_batch_jets(labels, trks, trk_features= ['trk_btagIp_d0',
+'trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty'], single_func = None):
+    """
+    
+    """
+    def single_val(arr):
+        """
+        Reducing the array to a single value
+        max, avg, specific element
+        """
+        return np.average(arr)
+
+    if single_func == None:
+        single_func = single_val
+    def compare_jets(jets, labels, label = 0):
+        """
+        Generate list of singular values for each jet
+        """
+        num_features = jets[0].shape[1]
+        comp_info = [[]] * num_features
+        l_jets = jets[labels[:, label]]
+        for i in l_jets:
+            [comp_info[m].append(single_func(i[:, m])) for m in range(num_features)]
+        return comp_info
+
+    info = [compare_jets(trks, labels, label = i) for i in range(3)]
+    f, ax = plt.subplots(len(trk_features)//2,1 + len(trk_features)//2, figsize = (12, 8))
+    b = ax.flatten()
+    for l in range(3):
+        l_data = info[l]
+        for f in range(len(trk_features)):
+            b[f].hist(l_data[f], label = myplot.mylabels[l], range = (0, 0.2), bins = 30, density = True, histtype = "step")
+            b[f].set_title(f"{trk_features[f]}")
+            b[f].legend()
