@@ -56,7 +56,7 @@ backs = ["5"]
 # %% Load Data
 print(f"Load Training")
 train_loader = data.GraphLoader(signals, backs, graph_dir='ographs')
-train_data, train_label = data.load_all(train_loader, num_batches= 30)
+train_data, train_label = data.load_all(train_loader, num_batches= 10)
 print(f"Load Testing")
 test_loader = data.GraphLoader(signals, backs, tag = 'r9364', graph_dir='ographs')
 test_data, test_label = data.load_all(test_loader, num_batches= 7)
@@ -163,7 +163,7 @@ class Trainer:
             true_label_list.append(tf.argmax(label_list[graph], axis = 1))
         return np.concatenate(true_label_list, axis = 0), np.concatenate(preds, axis = 0)
 # %% Prepare for training
-model = graphs.INModel(len(labels), 1)
+model = graphs.INModel(len(labels), nglayers=0)
 t = Trainer(model)
 
 # %% Training
@@ -180,6 +180,7 @@ for epoch in tqdm.trange(epochs):
     ax_t.set_ylabel('loss')
     ax_t.set_ylim(1e-1, 1e3)
     ax_t.set_xlabel('epoch')
+    ax_t.grid()
     ax_t.legend()
     fig_t.savefig(f'{settings.modelstats}/training.png')
     fig_t.savefig(f'{settings.modelstats}/training.pdf')
