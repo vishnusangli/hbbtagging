@@ -18,7 +18,6 @@ import graph_nets as gn
 
 sys.path.append("..")
 import settings
-
 # %%
 trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty']
 calo_features = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
@@ -28,7 +27,7 @@ signal = 1
 tag = 'r10201'
 maxnum = 300000
 
-DIRECTORY = 'mass_graphs'
+DIRECTORY = 'labeled_graphs'
 
 if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     import argparse
@@ -44,10 +43,6 @@ if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     tag = args.tag
 
 strlabels=list(map(lambda l: f'label{l}', labels))
-
-
-
-
 # %%
 ## Load Files
 if signal:
@@ -64,6 +59,7 @@ fatjets = data.general_load(filename)
 ## Labelling 
 data.label(fatjets)
 fatjets = fatjets[np.any(fatjets[strlabels], axis = 1)].copy()
+
 # %%
 ## Method 1
 #graphs = alt_create_graphs(fatjets, constits, trk_features)
@@ -91,7 +87,6 @@ def biased_single_event(fatjets, constits, feat):
 # Filters required features and performs absolute of all valeus
 constits = np.array(constits)
 constits = np.dstack([constits[i][fatjets.index.values] for i in trk_features])
-
 # %%
 ## Feature Normalization (A manually-set bound that focuses 
 # on the distribution and excludes outliers)

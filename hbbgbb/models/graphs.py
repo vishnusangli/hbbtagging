@@ -16,12 +16,6 @@ class INModel(snt.Module):
         """
         super(INModel, self).__init__()
 
-        self.norm = gn.modules.GraphIndependent( #Remove this
-                node_model_fn  =lambda: snt.LayerNorm(0, create_scale=True, create_offset=True),
-                edge_model_fn  =lambda: snt.LayerNorm(0, create_scale=True, create_offset=True),
-                global_model_fn=lambda: snt.LayerNorm(0, create_scale=True, create_offset=True)
-            )
-
         self.glayers = []
         for i in range(nglayers):
             graph_network = gn.modules.InteractionNetwork(
@@ -36,7 +30,6 @@ class INModel(snt.Module):
         )
 
     def __call__(self,data):
-        data = self.norm(data)
         for glayer in self.glayers:
             data = glayer(data)
         return self.olayer(data)

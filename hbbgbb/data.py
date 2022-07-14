@@ -308,7 +308,7 @@ class LoadGraph:
 
         If number of jets is less than or equal to 1, graph creation is forfeited.
         """
-        glob_vars.append(fatjet['mass'])
+        glob_vars.append(fatjet['label'])
         globals = glob_vars
         #fj_vars = ['Xbb2020v2_QCD', 'Xbb2020v2_Higgs', 'Xbb2020v2_Top']
         #for elem in fj_vars:
@@ -539,7 +539,7 @@ class GraphLoader:
     def is_finished(self):
         return self.finished
 
-def load_all(loader: GraphLoader, batch_size: int = 10000, num_batches:int = 200):
+def load_all(loader: GraphLoader, batch_size: int = 10000, num_batches:int = 200, ratio: list = [0.47, 0.06, 0.47]):
     """
     Load all batches of a given dataset. Returned as a list of np arrays for 
     batch graphs and labels

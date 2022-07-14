@@ -41,7 +41,7 @@ if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     epochs = args.epochs
 
 strlabels=list(map(lambda l: f'label{l}', labels))
-
+label_conv = ["hbb","QCD(bb)","QCD(other)"]
 # %% Formatting
 from hbbgbb import formatter
 fmt=formatter.Formatter('variables.yaml')
@@ -54,12 +54,21 @@ signals = ["1100", "1200", "1400"]
 backs = ["5"]
 
 # %% Load Data
+"""
+Sample ratios
+[0.497, 0.06, 0.497]
+[0.4999, 0.0002, 0.4999]
+[0.4999, 0.4999, 0.0002]
+
+"""
 print(f"Load Training")
-train_loader = data.GraphLoader(signals, backs, graph_dir='ographs')
-train_data, train_label = data.load_all(train_loader, num_batches= 10)
+train_loader = data.GraphLoader(signals, backs, graph_dir='labeled_graphs')
+train_data, train_label = data.load_all(train_loader, batch_size=10000, ratio=[0.497, 0.06, 0.497],
+                                    num_batches= 10)
 print(f"Load Testing")
-test_loader = data.GraphLoader(signals, backs, tag = 'r9364', graph_dir='ographs')
-test_data, test_label = data.load_all(test_loader, num_batches= 7)
+test_loader = data.GraphLoader(signals, backs, tag = 'r9364', graph_dir='labeled_graphs')
+test_data, test_label = data.load_all(test_loader, batch_size=10000, ratio=[0.497, 0.06, 0.497],
+                                    num_batches= 7)
 # %%
 test_loader, train_loader = None, None
 
@@ -82,11 +91,14 @@ test_loader, train_loader = None, None
 #     ax.set_yscale('log')
 #     ax.legend(title='label0')
 #     fig.savefig(col)
-def get_current_graph(logits, labels, curr_label = 0, ax = None):
-    label_conv = ["hbb","QCD(bb)","QCD(other)"]
-    df = pd.DataFrame(logits, columns = ['score0', 'score1', 'score2'])
-    df['label'] = tf.argmax(labels, axis = 1)
-    myplt.labels(df,f'score{curr_label}','label',fmt=fmt, ax = ax)
+def get_current_graph(logits, true_labels, curr_label = 0, ax = None):
+    """
+    Wrapper function that handles plotting of a single score distribution
+    subplot in an epoch?
+    """
+    df = pd.DataFrame(logits, columns = [f'score{i}' for i in labels])
+    df['label'] = tf.argmax(true_labels, axis = 1)
+    myplt.labels(df,f'score{curr_label}','label',fmt=fmt, ax=ax)
     ax.set_title(f"model {output} label{curr_label} - {label_conv[curr_label]}")
     '''
     plt.title(f"model {output} label{curr_label} - {label_conv[curr_label]}")
@@ -125,10 +137,10 @@ class Trainer:
                                                                 labels = test_labels[i])
                 test_loss += tf.reduce_mean(loss)
                 test_aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), tf.argmax(test_labels[i], axis = 1), score = 0)
-                fig_s,ax_s=plt.subplots(ncols=3,figsize=(24,8)) #scores
+                fig_s,ax_s=plt.subplots(ncols=len(labels),figsize=(24,8)) #scores
 
                 logits = tf.nn.softmax(logits, axis = 1)
-                [get_current_graph(logits, test_labels[i], lab, ax_s[lab]) for lab in range(3)]
+                [get_current_graph(logits, test_labels[i], lab, ax_s[lab]) for lab in range(len(labels))]
                 plt.suptitle(f"model {output}: epoch-{epoch}")
                 fig_s.savefig(f'scores/score-{epoch}.pdf')
 
