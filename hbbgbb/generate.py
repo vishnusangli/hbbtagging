@@ -1,15 +1,12 @@
 # %%
-import glob
 import sys
 import os
-
 import numpy as np
 import pandas as pd
 import h5py
 import itertools
 import tqdm
 import graph_nets as gn
-import tensorflow as tf
 import pickle
 import networkx
 import data
@@ -27,7 +24,7 @@ signal = 1
 tag = 'r10201'
 maxnum = 300000
 
-DIRECTORY = 'labeled_graphs'
+DIRECTORY = 'feature_graphs'
 
 if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     import argparse
@@ -61,9 +58,42 @@ data.label(fatjets)
 fatjets = fatjets[np.any(fatjets[strlabels], axis = 1)].copy()
 
 # %%
-## Method 1
-#graphs = alt_create_graphs(fatjets, constits, trk_features)
+def create_single_graph(fatjet, constit, feat, glob_vars = [], num_jets = None): #Used in generate
+    """
+    Generation of a single graph_dict. \n
+        `fatjet`: Dataframe row of jet
+        `constit`: np 2d array of track info
+        `feat`: track features
+        `glob_vars`: init global features. These are altered throughout the function
+        `num_jets`: upper bound on the number of jet
 
+    If number of jets is less than or equal to 1, graph creation is forfeited.
+    """
+    fj_indices = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
+    globals = np.array(fatjet[fj_indices], dtype = float)
+    globals = np.concatenate([globals, glob_vars])
+    #fj_vars = ['Xbb2020v2_QCD', 'Xbb2020v2_Higgs', 'Xbb2020v2_Top']
+    #for elem in fj_vars:
+    #    globals.append(fatjet[elem])
+
+    # Nodes are individual tracks
+    nodes=np.array(constit)
+    if len(nodes) <= 1:
+        return False, []
+    if num_jets != None and nodes.shape[0] >= num_jets: 
+        nodes = nodes[:num_jets]
+
+    # Fully connected graph, w/o loops
+    i=itertools.product(range(nodes.shape[0]),range(nodes.shape[0]))
+    senders=[]
+    receivers=[]
+    for s,r in i:
+        if s==r: continue
+        senders.append(s)
+        receivers.append(r)
+    edges=[[]]*len(senders)
+
+    return True, {'globals':globals, 'nodes':nodes, 'edges':edges, 'senders':senders, 'receivers':receivers}
 
 
 def biased_single_event(fatjets, constits, feat):
@@ -72,7 +102,7 @@ def biased_single_event(fatjets, constits, feat):
     for (i,fatjet),constit in tqdm.tqdm(zip(fatjets.iterrows(),constits),total=len(fatjets.index)):
         constit=constit[~data.isnanzero(constit[:, 0])] #Use first column as indicator
         label = fatjet.label
-        success, graph_dict = data.LoadGraph.create_single_graph(fatjet, constit, feat, num_jets=100)
+        success, graph_dict = create_single_graph(fatjet, constit, feat, num_jets=100)
         ### the above function call generates a single graph #####
         if success:
             dgraphs[label].append(graph_dict) #Number of jets
@@ -90,7 +120,7 @@ constits = np.dstack([constits[i][fatjets.index.values] for i in trk_features])
 # %%
 ## Feature Normalization (A manually-set bound that focuses 
 # on the distribution and excludes outliers)
-
+constits = np.array(constits, dtype = float)
 constits = np.abs(constits)
 norm_lims = [2, 3, 0.00175, 5, 10]
 for col in range(len(norm_lims)):
@@ -131,35 +161,4 @@ for i in range(3):
 
 # %%
 f.close()
-# %%
-'''
-import plot as myplt
-import matplotlib.pyplot as plt
-import formatter
-fmt=formatter.Formatter('../variables.yaml')
-
-statsdir = f'{settings.statsdir}/{tag}_{part1}_{file}'
-if not os.path.exists(statsdir):
-    os.makedirs(statsdir)
-
-### Fat jet stats
-for feature in calo_features+['nConstituents']:
-   myplt.labels(fatjets, feature, 'label', fmt=fmt)
-   plt.title(f"{feature} for {part1}_{file}")
-   plt.savefig(f'{statsdir}/labels_{feature}.pdf')
-   plt.show()
-   plt.clf()
-'''
-# %%
-### fjc data
-
-
-# %%
-"""
-Current files used for 
-signals: 1100, 1200
-background: 5
-
-python generate.py --file - --signal  1 --file r9364
-
-"""
+ # %%

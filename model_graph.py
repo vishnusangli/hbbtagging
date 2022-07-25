@@ -62,13 +62,13 @@ Sample ratios
 
 """
 print(f"Load Training")
-train_loader = data.GraphLoader(signals, backs, graph_dir='labeled_graphs')
-train_data, train_label = data.load_all(train_loader, batch_size=10000, ratio=[0.497, 0.06, 0.497],
-                                    num_batches= 10)
+train_loader = data.GraphLoader(signals, backs, graph_dir='feature_graphs')
+train_data, train_label = data.load_all(train_loader, batch_size=10000, ratio=[0.47, 0.06, 0.47],
+                                    num_batches= 20)
 print(f"Load Testing")
-test_loader = data.GraphLoader(signals, backs, tag = 'r9364', graph_dir='labeled_graphs')
-test_data, test_label = data.load_all(test_loader, batch_size=10000, ratio=[0.497, 0.06, 0.497],
-                                    num_batches= 7)
+test_loader = data.GraphLoader(signals, backs, tag = 'r9364', graph_dir='feature_graphs')
+test_data, test_label = data.load_all(test_loader, batch_size=10000, ratio=[0.47, 0.06, 0.47],
+                                    num_batches= 4)
 # %%
 test_loader, train_loader = None, None
 
@@ -137,12 +137,14 @@ class Trainer:
                                                                 labels = test_labels[i])
                 test_loss += tf.reduce_mean(loss)
                 test_aoc = analysis.aoc(np.array(tf.nn.softmax(logits)), tf.argmax(test_labels[i], axis = 1), score = 0)
+
                 fig_s,ax_s=plt.subplots(ncols=len(labels),figsize=(24,8)) #scores
 
                 logits = tf.nn.softmax(logits, axis = 1)
                 [get_current_graph(logits, test_labels[i], lab, ax_s[lab]) for lab in range(len(labels))]
                 plt.suptitle(f"model {output}: epoch-{epoch}")
                 fig_s.savefig(f'scores/score-{epoch}.pdf')
+                plt.close(fig_s)
 
         # Training
         for i in range(len(train_labels)):
@@ -161,73 +163,107 @@ class Trainer:
             train_loss += loss
 
 
-
+        test_loss = np.divide(test_loss, len(test_labels))
+        train_loss = np.divide(train_loss, len(train_labels))
         # save training status
-        self.stat=self.stat.append({'train_loss':float(loss), 'test_loss':float(test_loss), 'train_aoc_gbb':float(train_aoc[0]), 'train_aoc_other':float(train_aoc[1]), 'test_aoc_gbb':float(test_aoc[0]), 'test_aoc_other':float(test_aoc[1])}, ignore_index=True)
+        self.stat=self.stat.append({'train_loss':float(loss), 'test_loss':float(test_loss), 'train_aoc_gbb':float(train_aoc[1]), 
+                                    'train_aoc_other':float(train_aoc[2]), 'test_aoc_gbb':float(test_aoc[1]), 
+                                    'test_aoc_other':float(test_aoc[2])}, ignore_index=True)
         return train_loss
     
     def test_model_preload(self, graph_list, label_list):
         preds = []
         true_label_list = []
-        for graph in tqdm.tqdm(range(len(graph_list))):
+        for graph in range(len(graph_list)):
             pred = self.model(graph_list[graph])
-            preds.append(tf.nn.softmax(pred.globals))
+            preds.append(pred.globals)
             true_label_list.append(tf.argmax(label_list[graph], axis = 1))
-        return np.concatenate(true_label_list, axis = 0), np.concatenate(preds, axis = 0)
-# %% Prepare for training
-model = graphs.INModel(len(labels), nglayers=0)
+        return np.concatenate(true_label_list, axis = 0), tf.nn.softmax(np.concatenate(preds, axis = 0))
+
+
+# %%
+"""
+OUTPUT_EDGE_SIZE = 2
+OUTPUT_NODE_SIZE = 4
+OUTPUT_GLOBAL_SIZE = len(labels)
+graph_network = gn.modules.GraphNetwork(
+    edge_model_fn=lambda: snt.Linear(output_size=OUTPUT_EDGE_SIZE),
+    node_model_fn=lambda: snt.Linear(output_size=OUTPUT_NODE_SIZE),
+    global_model_fn=lambda: snt.Linear(output_size=OUTPUT_GLOBAL_SIZE))
+"""
+
+# %%
+""""
+graph_indep = gn.modules.GraphIndependent(
+    global_model_fn=lambda: snt.nets.MLP([len(labels)])
+)
+"""
+# %%
+#graph_indep = gn.modules.GraphIndependent()
+#model = graphs.INModel(len(labels), nglayers=0)
+#model = graphs.GNModel(nlabels=len(labels), nlayers=1, OUTPUT_NODE_SIZE=4)
+model = graphs.DSModel(OUTPUT_NODE_SIZE=3, nlabels=3, nlayers=1)
+#model = graphs.GIModel(nlabels = 3, hidden_layers = 2, hidden_size = 256)
 t = Trainer(model)
 
 # %% Training
-fig_t,ax_t=plt.subplots(figsize=(8,8)) #training
+
 for epoch in tqdm.trange(epochs):
     loss=float(t.step(train_data, train_label, test_data, test_label, epoch))
 
     # Plot the status of the training
+    fig_t,ax_t=plt.subplots(figsize=(8,8), facecolor = 'white') #training
     ax_t.clear()
     ax_t.set_title(f"{output} Training curve")
     ax_t.plot(t.stat.train_loss,label='Training')
     ax_t.plot(t.stat.test_loss ,label='Test')
     ax_t.set_yscale('log')
     ax_t.set_ylabel('loss')
-    ax_t.set_ylim(1e-1, 1e3)
     ax_t.set_xlabel('epoch')
     ax_t.grid()
     ax_t.legend()
     fig_t.savefig(f'{settings.modelstats}/training.png')
+    ax_t.set_ylim(1e-2, 1e1)
     fig_t.savefig(f'{settings.modelstats}/training.pdf')
+    #plt.show()
+    plt.close(fig_t)
     
     true_labels, predsm = t.test_model_preload(test_data, test_label)
     analysis.bare_roc(np.array(predsm), true_labels, 0, f'roc_{output}', epoch_roc=True, epoch_num = epoch)
 
     # Plot the scores
 
-# %% Plotting train aoc
-plt.figure()
-plt.plot(t.stat.train_aoc_gbb, label = "QCD(gbb)")
-plt.plot(t.stat.train_aoc_other, label = "QCD(other)")
-plt.title(f"{output} ROC training AOC curve")
-plt.ylabel('AOC')
-plt.yscale("log")
-plt.ylim(1e-1, 1e3)
-plt.xlabel('epoch')
-plt.legend()
-plt.savefig(f'{MODELSTATS}/train_aoc.pdf')
-plt.show()
-plt.clf()
+    # %% Plotting train aoc
+    plt.figure(figsize=(8,8))
+    plt.plot(t.stat.train_aoc_gbb, label = "QCD(gbb)")
+    plt.plot(t.stat.train_aoc_other, label = "QCD(other)")
+    plt.title(f"{output} ROC training AOC curve")
+    plt.ylabel('AOC')
+    plt.yscale("log")
+    plt.ylim(1e-3, 1)
+    plt.xlabel('epoch')
+    plt.legend()
+    plt.grid()
+    plt.savefig(f'{MODELSTATS}/train_aoc.pdf')
+    #plt.show()
+    plt.close()
+    plt.clf()
 
-# %% Plotting test aoc
-plt.plot(t.stat.test_aoc_gbb, label = "QCD(gbb)")
-plt.plot(t.stat.test_aoc_other, label = "QCD(other)")
-plt.title(f"{output} ROC testing AOC curve")
-plt.ylabel('AOC')
-plt.yscale("log")
-plt.ylim(1e-1, 1e3)
-plt.xlabel('epoch')
-plt.legend()
-plt.savefig(f'{MODELSTATS}/test_aoc.pdf')
-plt.show()
-plt.clf()
+    # %% Plotting test aoc
+    plt.figure(figsize=(8,8))
+    plt.plot(t.stat.test_aoc_gbb, label = "QCD(gbb)")
+    plt.plot(t.stat.test_aoc_other, label = "QCD(other)")
+    plt.title(f"{output} ROC testing AOC curve")
+    plt.ylabel('AOC')
+    plt.yscale("log")
+    plt.ylim(1e-3, 1)
+    plt.xlabel('epoch')
+    plt.legend()
+    plt.grid()
+    plt.savefig(f'{MODELSTATS}/test_aoc.pdf')
+    #plt.show()
+    plt.close()
+    plt.clf()
 # %% Save output
 true_labels, predsm = t.test_model_preload(test_data, test_label)
 analysis.bare_roc(np.array(predsm), true_labels, 0, f'roc_{output}')

@@ -49,7 +49,7 @@ def roc(df, score, output=None, plot=True):
         if output is not None:
             fig.savefig(f"{ROC_DIR}/{ROC_IMG}/{output}.pdf")
         fig.show()
-
+        plt.close(fig)
     # Save ROC curves
     if output is not None:
         np.save(f'{ROC_DIR}/{output}.npy',rocs)
@@ -92,7 +92,7 @@ def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_ro
             np.save(f'{ROC_DIR}/{output}.npy',rocs)
     else:
         np.save(f'epochs/{output}_epoch-{epoch_num}.npy',rocs)
-
+    plt.close(fig)
     
 def aoc(preds, real_labels, score = 0):
     """
@@ -109,7 +109,7 @@ def aoc(preds, real_labels, score = 0):
         h = 1- np.cumsum(h)/np.sum(h)
         rocs[label] = h
     
-    area = [1-auc(rocs[0], 1- rocs[label]) for label in labels]
+    area = [1- auc(rocs[0], 1- rocs[label]) for label in labels]
     return area
     
     
