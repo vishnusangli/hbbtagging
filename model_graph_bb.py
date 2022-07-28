@@ -1,7 +1,7 @@
-# %%
-#%load_ext autoreload
-#%autoreload 2
+"""
+This is a specific graph net training file for optimizing QCD (bb) training.
 
+"""
 # %%
 import sys
 
@@ -63,15 +63,19 @@ Sample ratios
 """
 print(f"Load Training")
 train_loader = data.GraphLoader(signals, backs, graph_dir='feature_graphs')
-train_data, train_label = data.load_all(train_loader, batch_size=10000, ratio=[0.4999, 0.0002, 0.4999],
-                                    num_batches= 30)
+train_data, train_label = data.load_all(train_loader, batch_size=5000, ratio=[0.4999, 0.4999, 0.0002],
+                                    num_batches= 100)
 print(f"Load Testing")
 test_loader = data.GraphLoader(signals, backs, tag = 'r9364', graph_dir='feature_graphs')
-test_data, test_label = data.load_all(test_loader, batch_size=10000, ratio=[0.4999, 0.0002, 0.4999],
-                                    num_batches= 5)
+test_data, test_label = data.load_all(test_loader, batch_size=5000, ratio=[0.4999, 0.4999, 0.0002],
+                                    num_batches= 10)
 # %%
 test_loader, train_loader = None, None
 
+# %%
+# Redistribute batches -->
+
+# %%
 def get_current_graph(logits, true_labels, curr_label = 0, ax = None):
     """
     Wrapper function that handles plotting of a single score distribution
@@ -88,7 +92,6 @@ def get_current_graph(logits, true_labels, curr_label = 0, ax = None):
     plt.clf()
     '''
 # %% Training procedure
-
 class Trainer:
     def __init__(self, model):
         # Model to keep track of
@@ -157,8 +160,8 @@ class Trainer:
 #graph_indep = gn.modules.GraphIndependent()
 #model = graphs.INModel(len(labels), nglayers=0)
 #model = graphs.GNModel(nlabels=len(labels), nlayers=1, OUTPUT_NODE_SIZE=3)
-model = graphs.DSModel(OUTPUT_NODE_MLP = [3], nlabels=3, nlayers=1, hid_layers=[256, 256])
-#model = graphs.GIModel(nlabels = 3, hidden_layers = 2, hidden_size = 512)
+#model = graphs.DSModel(OUTPUT_NODE_SIZE=3, nlabels=3, nlayers=1)
+model = graphs.GIModel(nlabels = 3, hidden_layers = 2, hidden_size = 256)
 t = Trainer(model)
 
 # %% Training

@@ -25,6 +25,7 @@ tag = 'r10201'
 maxnum = 300000
 
 DIRECTORY = 'feature_graphs'
+INCLUDE_EDGES = False
 
 if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     import argparse
@@ -83,20 +84,30 @@ def create_single_graph(fatjet, constit, feat, glob_vars = [], num_jets = None):
     if num_jets != None and nodes.shape[0] >= num_jets: 
         nodes = nodes[:num_jets]
 
+    graph_dict = {'globals':globals, 'nodes':nodes}
     # Fully connected graph, w/o loops
-    i=itertools.product(range(nodes.shape[0]),range(nodes.shape[0]))
-    senders=[]
-    receivers=[]
-    for s,r in i:
-        if s==r: continue
-        senders.append(s)
-        receivers.append(r)
-    edges=[[]]*len(senders)
+    if INCLUDE_EDGES:
+        i=itertools.product(range(nodes.shape[0]),range(nodes.shape[0]))
+        senders=[]
+        receivers=[]
+        for s,r in i:
+            if s==r: continue
+            senders.append(s)
+            receivers.append(r)
+        edges=[[]]*len(senders)
 
-    return True, {'globals':globals, 'nodes':nodes, 'edges':edges, 'senders':senders, 'receivers':receivers}
+        graph_dict['edges'] = edges
+        graph_dict['senders'] = senders
+        graph_dict['receivers'] = receivers    
+
+    return True, graph_dict
 
 
 def biased_single_event(fatjets, constits, feat):
+    """
+    Given a single event/sample/file, this method generates graph dicts for all 3 labels, 
+    partitioned respectively. 
+    """
     dgraphs = [[], [], []]
     real_iter = 0
     for (i,fatjet),constit in tqdm.tqdm(zip(fatjets.iterrows(),constits),total=len(fatjets.index)):

@@ -381,6 +381,7 @@ class GraphLoader: ##Used for graphs
         nums = [int(i * batch_size) for i in label_ratio]
         labels, graphs = [], []
         for i in range(len(nums)):
+            if nums[i] < 1: continue
             curr_graphs, curr_labels = self.give_data(i, nums[i])
             if cast:
                 curr_graphs = [self.cast_data(i) for i in curr_graphs]
@@ -458,7 +459,7 @@ def load_all(loader: GraphLoader, batch_size: int = 10000, num_batches:int = 200
     while not loader.is_finished():
         if num > num_batches: break
         print(f"Batch {num}")
-        batch_g, batch_l = loader.give_batch(label_ratio = [0.497, 0.06, 0.497], batch_size=batch_size)
+        batch_g, batch_l = loader.give_batch(label_ratio = ratio, batch_size=batch_size)
         if len(batch_l) > 0:
             total_g.extend([batch_g])
             total_l.extend([np.array(batch_l)])

@@ -38,23 +38,30 @@ class INModel(snt.Module):
 class GNModel(snt.Module):
     def __init__(self, name = None, OUTPUT_EDGE_SIZE = 2, OUTPUT_NODE_SIZE = 2, nlabels = 3, nlayers = 1):
         super().__init__(name)
+        self.norm = gn.modules.GraphIndependent(
+            node_model_fn  = None,
+            edge_model_fn  = None,
+            global_model_fn=lambda: snt.LayerNorm(0, create_scale=True, create_offset=True)
+        )
+
     
         self.layers = []
         for layer in range(nlayers):
             graph_network = gn.modules.GraphNetwork(
                 edge_model_fn=lambda: snt.nets.MLP([OUTPUT_EDGE_SIZE]),
                 node_model_fn=lambda: snt.nets.MLP([OUTPUT_NODE_SIZE]),
-                global_model_fn=lambda: snt.nets.MLP([nlabels])
+                global_model_fn=lambda: snt.nets.MLP([256, 256, nlabels])
             )
             self.layers.append(graph_network)
     def __call__(self, graph):
+        graph = self.norm(graph)
         for layer in self.layers:
             graph = layer(graph)
         return graph
         
 
 class DSModel(snt.Module):
-    def __init__(self, name = None, OUTPUT_NODE_SIZE = 2, nlabels = 3, nlayers = 1):
+    def __init__(self, name = None, OUTPUT_NODE_MLP = [2], nlabels = 3, nlayers = 1, hid_layers = []):
         super().__init__(name)
 
         self.norm = gn.modules.GraphIndependent(
@@ -66,7 +73,7 @@ class DSModel(snt.Module):
         self.layers = []
         for layer in range(nlayers):
             ds_network = gn.modules.DeepSets(
-                node_model_fn=lambda: snt.nets.MLP([OUTPUT_NODE_SIZE]),
+                node_model_fn=lambda: snt.nets.MLP([3]),
                 global_model_fn=lambda: snt.nets.MLP([256, 256, nlabels])
             )
             self.layers.append(ds_network)

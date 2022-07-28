@@ -84,6 +84,7 @@ def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_ro
     ax.set_ylim(0,1)
     fig.legend(title='Background')
     fig.tight_layout()
+
     if not epoch_roc:
         if output is not None:
             fig.savefig(f"{ROC_DIR}/{ROC_IMG}/{output}.pdf")
@@ -92,6 +93,7 @@ def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_ro
             np.save(f'{ROC_DIR}/{output}.npy',rocs)
     else:
         np.save(f'epochs/{output}_epoch-{epoch_num}.npy',rocs)
+        fig.savefig(f"model_stats/roc_curve.png")
     plt.close(fig)
     
 def aoc(preds, real_labels, score = 0):
