@@ -380,9 +380,14 @@ class GraphLoader: ##Used for graphs
     trk_features= ['trk_btagIp_d0','trk_btagIp_z0SinTheta', 'trk_qOverP', 'trk_btagIp_d0Uncertainty', 'trk_btagIp_z0SinThetaUncertainty'], cast = True):
         nums = [int(i * batch_size) for i in label_ratio]
         labels, graphs = [], []
+
+        num_labels = 3
+        if 0 in label_ratio:
+            num_labels = 2
+
         for i in range(len(nums)):
             if nums[i] < 1: continue
-            curr_graphs, curr_labels = self.give_data(i, nums[i])
+            curr_graphs, curr_labels = self.give_data(i, nums[i], num_labels=num_labels)
             if cast:
                 curr_graphs = [self.cast_data(i) for i in curr_graphs]
             labels.append(curr_labels)
@@ -410,7 +415,7 @@ class GraphLoader: ##Used for graphs
             graph_dict[i] = tf.cast(graph_dict[i], dtype=tf.float32)
         return graph_dict
         
-    def give_data(self, label, num_jets, lab = True):
+    def give_data(self, label, num_jets, lab = True, num_labels = 3):
         """
         Return a given label's jets and change iter
         """
@@ -437,12 +442,13 @@ class GraphLoader: ##Used for graphs
 
         if not lab:
             num_jets = 0
-        return dicts, self.gen_logits(label, num_jets)
+        return dicts, self.gen_logits(label, num_jets, nlabels = num_labels)
 
     def gen_logits(self, label, size, nlabels = 3):
         if size == 0:
             return []
-        
+        if label >= nlabels: #Becomes last label
+            label = nlabels -1 
         a = np.array([i == label for i in range(nlabels)], dtype  = float)
         return np.tile(a, (size, 1))
 
@@ -456,15 +462,12 @@ def load_all(loader: GraphLoader, batch_size: int = 10000, num_batches:int = 200
     """
     total_g, total_l = [], []
     num = 1
-    while not loader.is_finished():
-        if num > num_batches: break
-        print(f"Batch {num}")
+    for count in tqdm.tqdm(range(num_batches)):
         batch_g, batch_l = loader.give_batch(label_ratio = ratio, batch_size=batch_size)
+        if loader.is_finished(): break
         if len(batch_l) > 0:
             total_g.extend([batch_g])
             total_l.extend([np.array(batch_l)])
-
-        num += 1
     return total_g, total_l
 
 def display_batch_jets(labels, trks, trk_features= ['trk_btagIp_d0',

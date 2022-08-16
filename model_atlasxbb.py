@@ -14,7 +14,7 @@ from hbbgbb import analysis
 
 # %% Arguments
 parser = argparse.ArgumentParser(description='Calculate ROC curves for ATLAS Xbb taggers')
-parser.add_argument('version', type=str, nargs='?', default='Xbb202006', help='Version of the tagger')
+parser.add_argument('version', type=str, nargs='?', default='Xbb2020v2', help='Version of the tagger')
 args = parser.parse_args()
 
 version = args.version

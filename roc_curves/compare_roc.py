@@ -31,7 +31,7 @@ for roc in rocs:
     therocs[roc]=theroc
     labels.update(theroc.keys())
 labels.remove(0)
-colors = ['red', 'blue', 'orange', 'green', 'purple', 'black']
+colors = ['red', 'blue', 'orange', 'green', 'purple', 'black', 'brown', 'pink', 'gray', 'olive']
 # %% Plot the ROC curves
 
 for label in labels:

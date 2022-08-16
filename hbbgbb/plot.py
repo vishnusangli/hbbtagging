@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 
+import pandas as pd
+from numpy import argmax
 mylabels={0:'Higgs',1:'QCD (bb)', 2:'QCD (other)'}
 histcommon={'histtype':'step','density':True}
 
@@ -30,3 +32,13 @@ def labels(df, varname, labelcol, predcol=None, fmt=None, ax=None):
 
     fmt.subplot(varname, ax=ax)
     ax.set_ylabel('normalized')
+
+def get_current_graph(logits, true_labels, output, label_conv, fmt = None, curr_label = 0, ax = None):
+    """
+    Wrapper function that handles plotting of a single score distribution
+    subplot in an epoch?
+    """
+    df = pd.DataFrame(logits, columns = [f'score{i}' for i in labels])
+    df['label'] = argmax(true_labels, axis = 1)
+    labels(df,f'score{curr_label}','label',fmt=fmt, ax=ax)
+    ax.set_title(f"model {output} label{curr_label} - {label_conv[curr_label]}")

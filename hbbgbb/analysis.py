@@ -8,6 +8,13 @@ from sklearn.metrics import auc
 
 ROC_DIR = "roc_curves"
 ROC_IMG = "roc_imgs"
+
+def custom_div(x, y):
+    if x == 0: return 0
+    if y == 0: return x * np.inf
+    return np.divide(x, y)
+custom_div = np.vectorize(custom_div)
+
 def roc(df, score, output=None, plot=True):
     """
     Create ROC curves given `score` column.
@@ -28,7 +35,7 @@ def roc(df, score, output=None, plot=True):
 
     for label in labels:
         h,b=np.histogram(df[df.label==label][score],bins=100,range=(mymin,mymax))
-        h=1-np.cumsum(h)/np.sum(h) # turn into CDF
+        h=1- custom_div( np.cumsum(h),np.sum(h)) # turn into CDF
         rocs[label]=h
 
     # Plot ROC curves
@@ -54,7 +61,7 @@ def roc(df, score, output=None, plot=True):
     if output is not None:
         np.save(f'{ROC_DIR}/{output}.npy',rocs)
 
-def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_roc = False, epoch_num = 0) -> None:
+def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_roc = False, epoch_num = 0, file_dir = 'model_stats') -> None:
     """
     roc function with separate inputs, not in pd Dataframe
 
@@ -62,17 +69,22 @@ def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_ro
 
     Otherwise a copy
     """
-    labels = preds.shape[1]
+    labels = 3 #preds.shape[1]
+    # For ease, I am forcing the 3-label standard
     rocs={}
     mymin=np.floor(preds[:, score].min())
     mymax=np.ceil(preds[:, score].max())
 
     for label in range(labels):
-        h,b=np.histogram(preds[true_labels==label, score],bins=100,range=(mymin,mymax))
-        h=1-np.cumsum(h)/np.sum(h) # turn into CDF
+        temp = preds[true_labels==label, score]
+        if len(temp) > 0:
+            h,b=np.histogram(temp,bins=100,range=(mymin,mymax))
+        else:
+            h = np.tile(np.NaN, 100)
+        h=1- custom_div(np.cumsum(h),np.sum(h)) # turn into CDF
         rocs[label]=h
 
-    fig, ax=plt.subplots(1,1,figsize=(8,6))
+    fig, ax=plt.subplots(1,1,figsize=(8,6), facecolor = "white")
     for label in range(labels):
         if label==0: continue # this is signal
         ax.plot(rocs[0],1-rocs[label],'-',label=myplt.mylabels.get(label,label))
@@ -93,26 +105,34 @@ def bare_roc(preds, true_labels:np.array, score:int, output:str = None, epoch_ro
             np.save(f'{ROC_DIR}/{output}.npy',rocs)
     else:
         np.save(f'epochs/{output}_epoch-{epoch_num}.npy',rocs)
-        fig.savefig(f"model_stats/roc_curve.png")
+        ax.set_title(f"{output} ROC curve")
+        fig.savefig(f"{file_dir}/roc_curve.png")
     plt.close(fig)
-    
-def aoc(preds, real_labels, score = 0):
+
+def aoc(preds, real_labels, score = 0, labels_used = [0, 1, 2]):
     """
     Avoiding the use of appending to data pd
     Seems to be returning different values
     """
-    labels = [0, 1, 2]
+    labels = labels_used
 
     rocs = {}
     mymin = np.floor( np.min(preds[:, score]))
     mymax = np.ceil(np.max(preds[:, score]))
     for label in labels:
-        h, b = np.histogram(preds[real_labels == label, score], bins = 100, range = (mymin, mymax))
-        h = 1- np.cumsum(h)/np.sum(h)
+        temp = preds[real_labels == label, score]
+        if len(temp) > 0:
+            h,b=np.histogram(temp,bins=100,range=(mymin,mymax))
+        else:
+            h = np.tile(0, 100)
+        h = 1- custom_div( np.cumsum(h),np.sum(h))
         rocs[label] = h
-    
-    area = [1- auc(rocs[0], 1- rocs[label]) for label in labels]
-    return area
+
+    area = [1 - auc(rocs[score], 1- rocs[label]) for label in labels]
+
+    to_return = area
+    return to_return
+
     
     
 

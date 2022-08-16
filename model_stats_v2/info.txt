@@ -1,0 +1,5 @@
+First attempt at a compound model - 
+Learning rate = 0.01
+
+Primary model: 
+Graph Independent 

@@ -25,7 +25,7 @@ tag = 'r10201'
 maxnum = 300000
 
 DIRECTORY = 'feature_graphs'
-INCLUDE_EDGES = False
+INCLUDE_EDGES = True
 
 if 'ipykernel_launcher' not in sys.argv[0]: # running in a notebook
     import argparse
@@ -70,7 +70,7 @@ def create_single_graph(fatjet, constit, feat, glob_vars = [], num_jets = None):
 
     If number of jets is less than or equal to 1, graph creation is forfeited.
     """
-    fj_indices = ['mass', 'C2','D2','e3','Tau32_wta','Split12','Split23']
+    fj_indices = ['C2','D2','e3','Tau32_wta','Split12','Split23']
     globals = np.array(fatjet[fj_indices], dtype = float)
     globals = np.concatenate([globals, glob_vars])
     #fj_vars = ['Xbb2020v2_QCD', 'Xbb2020v2_Higgs', 'Xbb2020v2_Top']
